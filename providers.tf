@@ -1,4 +1,10 @@
-# Terraform configuration
+# --------------------------------------------------------
+# Terraform settings & provider requirements
+# --------------------------------------------------------
+# - required_version: ensures the installed terraform is compatible
+# - required_providers: pins to provider versions for repeatable plans
+#   and avoids incompatible upgrades
+# --------------------------------------------------------
 terraform {
   required_version = ">= 1.14.0"
 
@@ -18,19 +24,16 @@ terraform {
   }
 }
 
-# Docker provider
 provider "docker" {
   host = "unix:///var/run/docker.sock"
 }
 
-# Vault provider
 provider "vault" {
-  address = "http://localhost:8200"
-  token   = "dev-token"
+  address          = "http://localhost:8200"
+  token            = "dev-token"
   skip_child_token = true
 }
 
-# AWS provider
 provider "aws" {
   region                      = "us-east-1"
   skip_credentials_validation = true
