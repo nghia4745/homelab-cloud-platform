@@ -11,19 +11,31 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # Run using GitHub Runner
+  # checkov-scan:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+
+  #     - name: Run Checkov Action
+  #       uses: bridgecrewio/checkov-action@master
+  #       with:
+  #         # Scan the entire directory
+  #         directory: .
+  #         # Stop the pipeline if a 'High' or 'Critical' risk is found
+  #         soft_fail: false
+  #         framework: terraform
+  #         # This creates a nice summary in your GitHub Actions UI
+  #         output_format: cli,sarif
+  
+  # Run using local GitHub Runner
   checkov-scan:
-    runs-on: self-hosted # Local GitHub Runner
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Checkov Action
-        uses: bridgecrewio/checkov-action@master
-        with:
-          # Scan the entire directory
-          directory: .
-          # Stop the pipeline if a 'High' or 'Critical' risk is found
-          soft_fail: false
-          framework: terraform
-          # This creates a nice summary in your GitHub Actions UI
-          output_format: cli,sarif
+      - name: Run Checkov Action on local machine
+        run: |
+          checkov -d . --framework terraform --soft-fail
