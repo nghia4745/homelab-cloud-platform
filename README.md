@@ -1,5 +1,5 @@
 # Terraform DevOps Learning Project
-![Security Scan](https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/actions/workflows/security-scan.yml/badge.svg)
+# ![Security Scan](https://github.com/nghia4745/learn-terraform/actions/workflows/security-scan.yml/badge.svg) TODO: revisit badge after adding CI
 A hands-on Terraform project demonstrating infrastructure-as-code concepts with Docker, Vault secret management, and AWS resources.
 
 ## 📋 Prerequisites
