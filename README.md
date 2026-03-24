@@ -18,9 +18,8 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 ├── main.tf                # Docker nginx application resources
 ├── vault_docker.tf        # Docker Vault server resources
 ├── vault.tf              # Vault secret management (KV V2)
+├── aws.tf                # AWS resources (S3 bucket + security group)
 ├── variables.tf          # Input variable definitions
-├── security.tf           # AWS security group resources
-├── vulnerable_aws.tf     # AWS S3 bucket resources (intentionally insecure for learning)
 ├── secret.auto.tfvars    # Sensitive variables (auto-loaded, git-ignored)
 └── README.md             # This file
 ```
@@ -72,8 +71,12 @@ curl http://localhost:8080
   - Password: from `secret.auto.tfvars`
 
 ### AWS Resources (Mock)
-- **S3 Bucket**: `my-insecure-data-bucket-2026` (intentionally misconfigured for learning)
-- **Security Group**: Allows all inbound traffic (intentionally insecure for learning)
+- **S3 Bucket**: `my-secure-data-bucket-2026` with encryption and public access blocking
+  - Server-side encryption enabled (AES256)
+  - All public access blocked
+- **Security Group**: `allow_web_only` restricted to HTTP traffic
+  - Ingress: Allows port 80 (HTTP) only
+  - Egress: Allows all outbound traffic
 
 ## 🔐 Configuration
 
@@ -118,7 +121,7 @@ terraform destroy
 ### Development Only
 - AWS provider uses mock credentials (not real AWS access)
 - Vault runs in dev mode (not production-safe)
-- Security group allows all traffic (intentionally insecure for learning)
+- S3 bucket and security group are basic examples; production requires additional hardening
 
 ### Vault Integration
 - Vault container must start before secrets can be written
