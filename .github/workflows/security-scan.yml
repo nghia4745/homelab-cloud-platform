@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  # This tells GitHub to use the newer Node.js 24 engine now
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   checkov-scan:
     runs-on: ubuntu-latest
