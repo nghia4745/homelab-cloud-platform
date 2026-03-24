@@ -1,33 +1,35 @@
-# 1. Define the Provider (The "Plugin" for Docker)
-terraform {
-  required_providers {
-    docker = {
-      source  = "kreuzwerker/docker"
-      version = "~> 3.0"
-    }
+# Define the Vault Image
+resource "docker_image" "vault" {
+  name         = "hashicorp/vault:latest"
+  keep_locally = true
+}
+
+# Define the Vault Container
+resource "docker_container" "vault_server" {
+  name  = "vault-server"
+  image = docker_image.vault.image_id
+  
+  # Mimic the 'docker run' flags we used earlier
+  capabilities {
+    add = ["IPC_LOCK"]
   }
 
-  # backend "s3" {
-  #   bucket         = "my-homelab-terraform-state"
-  #   key            = "dev/docker-project.tfstate"
-  #   region         = "us-east-1"
-  #   encrypt        = true              # Mandatory for security
-  #   use_lockfile   = true              # Modern 2026 S3 native locking
-  # }
+  ports {
+    internal = 8200
+    external = 8200
+  }
+
+  env = [
+    "VAULT_DEV_ROOT_TOKEN_ID=dev-token",
+    "VAULT_ADDR=http://0.0.0.0:8200"
+  ]
 }
 
-provider "docker" {
-  # Connects to your local Docker socket
-  host = "unix:///var/run/docker.sock"
-}
-
-# 2. Define the Image (What to download)
 resource "docker_image" "nginx" {
   name         = "nginx:latest"
   keep_locally = false
 }
 
-# 3. Define the Container (How to run it)
 resource "docker_container" "web_server" {
   image = docker_image.nginx.image_id
   name  = "devops-practice-container"
@@ -37,7 +39,6 @@ resource "docker_container" "web_server" {
     external = 8080
   }
 
-  # Inject the secrets as env variables
   env = [
     "DB_USER=${data.vault_kv_secret_v2.db_creds.data["username"]}",
     "DB_PASS=${data.vault_kv_secret_v2.db_creds.data["password"]}"

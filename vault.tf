@@ -1,12 +1,9 @@
-provider "vault" {
-  address = "http://localhost:8200"
-  token = "dev-token"
-}
-
 # Create a specific secret
 resource "vault_kv_secret_v2" "db_creds" {
+  depends_on = [docker_container.vault_server]
+  
   mount = "secret"
-  name = "database/config"
+  name  = "database/config"
 
   data_json = jsonencode({
     username = "admin_duke",
@@ -16,6 +13,8 @@ resource "vault_kv_secret_v2" "db_creds" {
 
 # READ the secret from Vault
 data "vault_kv_secret_v2" "db_creds" {
+  depends_on = [vault_kv_secret_v2.db_creds]
+  
   mount = "secret"
-  name = "database/config"
+  name  = "database/config"
 }
