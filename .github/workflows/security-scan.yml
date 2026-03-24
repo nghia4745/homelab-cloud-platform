@@ -12,7 +12,7 @@ env:
 
 jobs:
   checkov-scan:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted # Local GitHub Runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
