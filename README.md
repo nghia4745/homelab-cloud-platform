@@ -141,15 +141,6 @@ terraform destroy
 
 ## 🔄 Next Steps
 
-Phase 2: Local CI/CD & Static Analysis (Current Focus)
-- [ ] Automate Security Scanning: Integrate Checkov or Trivy into a local workflow to catch the vulnerabilities in vulnerable_aws.tf.
-
-- [ ] GitHub Actions Integration: Create a .github/workflows/main.yml to run terraform validate and security scans on every push.
-
-- [ ] The Logic Test: Script a secret rotation in Vault and verify that Terraform successfully updates the Nginx container's environment.
-
-- [ ] Local Runner Setup: Configure a GitHub Actions self-hosted runner on the homelab server to execute builds locally.
-
 Phase 3: The Cloud Bridge
 - [ ] Remote State Migration: Move the local terraform.tfstate to an encrypted S3 bucket with state locking.
 
