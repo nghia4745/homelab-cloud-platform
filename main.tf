@@ -6,6 +6,14 @@ terraform {
       version = "~> 3.0"
     }
   }
+
+  # backend "s3" {
+  #   bucket         = "my-homelab-terraform-state"
+  #   key            = "dev/docker-project.tfstate"
+  #   region         = "us-east-1"
+  #   encrypt        = true              # Mandatory for security
+  #   use_lockfile   = true              # Modern 2026 S3 native locking
+  # }
 }
 
 provider "docker" {
@@ -28,4 +36,10 @@ resource "docker_container" "web_server" {
     internal = 80
     external = 8080
   }
+
+  # Inject the secrets as env variables
+  env = [
+    "DB_USER=${data.vault_kv_secret_v2.db_creds.data["username"]}",
+    "DB_PASS=${data.vault_kv_secret_v2.db_creds.data["password"]}"
+  ]
 }
