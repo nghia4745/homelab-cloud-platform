@@ -1,0 +1,25 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  checkov-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run Checkov Action
+        uses: bridgecrewio/checkov-action@master
+        with:
+          # Scan the entire directory
+          directory: .
+          # Stop the pipeline if a 'High' or 'Critical' risk is found
+          soft_fail : false
+          framework: terraform
+          # This creates a nice summary in your GitHub Actions UI
+          output_format: cli,sarif
