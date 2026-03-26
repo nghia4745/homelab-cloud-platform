@@ -1,7 +1,13 @@
+# This GitHub Actions workflow estimates infrastructure costs using Infracost.
+# It runs on pull requests to compare cost changes between the base and PR branches.
+
 name: Infracost Cost Estimate
+
+# Triggers: Run the workflow on pull requests to analyze cost impacts.
 on: [pull_request]
 
 jobs:
+  # Job: Generates and posts Infracost cost estimates for Terraform changes.
   infracost:
     name: Infracost
     runs-on: self-hosted # Use your Mac runner
@@ -13,20 +19,24 @@ jobs:
       INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
 
     steps:
+      # Step 1: Checkout the base branch to generate a baseline cost estimate.
       - name: Checkout base branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.ref }}
 
+      # Step 2: Generate Infracost cost estimate for the base branch.
       - name: Generate Infracost cost estimate baseline
         run: |
           infracost breakdown --path=. \
                             --format=json \
                             --out-file=/tmp/infracost-base.json
 
+      # Step 3: Checkout the PR branch to compare against the baseline.
       - name: Checkout PR branch
         uses: actions/checkout@v4
 
+      # Step 4: Generate the cost difference between base and PR branches.
       - name: Generate Infracost diff
         run: |
           infracost diff --path=. \
@@ -34,6 +44,7 @@ jobs:
                         --compare-to=/tmp/infracost-base.json \
                         --out-file=/tmp/infracost.json
 
+      # Step 5: Post the cost estimate as a comment on the pull request.
       - name: Post Infracost comment
         run: |
           infracost comment github --path=/tmp/infracost.json \

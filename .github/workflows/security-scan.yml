@@ -1,17 +1,22 @@
+# This GitHub Actions workflow performs security scans on Terraform code using Checkov.
+# It runs on pushes and pull requests to the main branch, ensuring infrastructure as code security.
+
 name: Security Scan
 
+# Triggers: Run the workflow on pushes or pull requests to the main branch.
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
+# Environment variables: Forces JavaScript actions to use Node.js 24 for compatibility.
 env:
-  # This tells GitHub to use the newer Node.js 24 engine now
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # Run using GitHub Runner
+  # Job 1: Commented out - Runs Checkov on GitHub-hosted runners (ubuntu-latest).
+  # Uses AWS credentials from secrets for scanning.
   # checkov-scan:
   #   runs-on: ubuntu-latest
   #   env:
@@ -33,7 +38,8 @@ jobs:
   #         # This creates a nice summary in your GitHub Actions UI
   #         output_format: cli,sarif
   
-  # Run using local GitHub Runner
+  # Job 2: Active job - Runs Checkov on a self-hosted runner (local machine).
+  # Uses AWS credentials and scans with custom policies from the 'policies' directory.
   checkov-scan:
     runs-on: self-hosted
     env:

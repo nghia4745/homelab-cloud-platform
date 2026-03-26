@@ -1,5 +1,10 @@
+# This GitHub Actions workflow performs hourly drift detection on Terraform-managed infrastructure.
+# It checks for changes between the current state and the planned state, alerting if drift is detected.
+
 name: Hourly Drift Detection
 
+# Triggers: Runs automatically at the start of every hour via cron schedule.
+# Also allows manual triggering for testing purposes.
 on:
   schedule:
     # Runs at the start of every hour
@@ -8,6 +13,7 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Job: Performs drift detection by running Terraform plan on the infrastructure.
   drift-check:
     runs-on: self-hosted
     env:
@@ -16,13 +22,19 @@ jobs:
       AWS_DEFAULT_REGION: "us-east-1"
       TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
     steps:
+      # Step 1: Checkout the repository code to access Terraform files.
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Step 2: Initialize Terraform with the real backend for state management.
       - name: Terraform Init
         # NOTE: For drift detection, we need the REAL backend, not backend=false
         run: terraform init
 
+      # Step 3: Run Terraform plan to check for drift.
+      # -detailed-exitcode returns:
+      # 0 = No Changes (Success)
+      # 2 = Drift Detected (Changes)
       - name: Check for Drift
         id: drift
         continue-on-error: true

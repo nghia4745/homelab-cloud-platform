@@ -1,7 +1,8 @@
+```markdown
 # Terraform DevOps Learning Project
 ![Security Scan](https://github.com/nghia4745/learn-terraform/actions/workflows/security-scan.yml/badge.svg)
 
-A hands-on Terraform project demonstrating infrastructure-as-code concepts with Docker, Vault secret management, and AWS resources.
+A hands-on Terraform project demonstrating infrastructure-as-code concepts with Docker, Vault secret management, AWS resources, custom security policies, and CI/CD automation.
 
 ## 📋 Prerequisites
 
@@ -9,6 +10,8 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 - Docker (running locally)
 - HashiCorp Vault (started via Terraform)
 - AWS credentials (for mock AWS resources)
+- Checkov (for custom security policies)
+- Infracost (for cost estimation, optional for CI/CD)
 
 ## 🏗️ Project Structure
 
@@ -21,6 +24,12 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 ├── aws.tf                # AWS resources (S3 bucket + security group)
 ├── variables.tf          # Input variable definitions
 ├── secret.auto.tfvars    # Sensitive variables (auto-loaded, git-ignored)
+├── policies/             # Custom Checkov security policies
+│   └── tagging_policy.yml # Enforces Owner tag on S3 buckets
+├── .github/workflows/    # GitHub Actions CI/CD workflows
+│   ├── security-scan.yml # Runs Checkov security scans
+│   ├── infracost.yml     # Estimates infrastructure costs on PRs
+│   └── drift-detection.yml # Hourly drift detection via Terraform plan
 └── README.md             # This file
 ```
 
@@ -88,6 +97,25 @@ db_password = "your-secure-password-here"
 
 > ⚠️ **Security Note**: `secret.auto.tfvars` is auto-loaded and should be git-ignored. Keep sensitive values out of version control.
 
+## 🛡️ Security & CI/CD
+
+### Custom Policies
+- **Checkov Policy**: `policies/tagging_policy.yml` enforces Owner tags on S3 buckets.
+
+### GitHub Actions Workflows
+- **Security Scan**: Runs Checkov on pushes/PRs to main, using custom policies.
+- **Infracost Estimate**: Calculates cost diffs on PRs and posts comments.
+- **Drift Detection**: Hourly Terraform plan checks for infrastructure drift.
+
+To run locally:
+```bash
+# Security scan with custom policies
+checkov -d . --external-checks-dir policies --framework terraform
+
+# Cost estimate
+infracost breakdown --path=.
+```
+
 ## 📝 Key Terraform Concepts Demonstrated
 
 - **Providers**: Docker, Vault, and AWS plugin configuration
@@ -96,6 +124,8 @@ db_password = "your-secure-password-here"
 - **Dependencies**: Explicit `depends_on` for sequencing resource creation
 - **Variables**: Sensitive input variables for credentials
 - **Interpolation**: Referencing resource outputs and data source values
+- **Custom Policies**: Writing and applying Checkov security checks
+- **CI/CD**: Automating scans, cost estimation, and drift detection
 
 ## 🧹 Useful Commands
 
@@ -138,21 +168,10 @@ terraform destroy
 - [Docker Provider](https://registry.terraform.io/providers/kreuzwerker/docker/latest)
 - [Vault Provider](https://registry.terraform.io/providers/hashicorp/vault/latest)
 - [AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest)
-
-## 🔄 Next Steps
-
-Phase 3: The Cloud Bridge
-- [ ] Remote State Migration: Move the local terraform.tfstate to an encrypted S3 bucket with state locking.
-
-- [ ] Infrastructure "Clean Up": Resolve the security flags in vulnerable_aws.tf and perform a first "clean" deploy to a real cloud provider.
-
-- [ ] Cloud Budgeting: Set up AWS/GCP budget alerts ($5 threshold) to prevent unexpected costs.
-
-Phase 4: Advanced Governance
-- [ ] Policy as Code: Implement Open Policy Agent (OPA) or Kyverno to enforce custom tagging and resource standards.
-
-- [ ] Observability Stack: Deploy Prometheus and Grafana to monitor the health of the "Cloud Bridge" infrastructure.
+- [Checkov Policies](https://www.checkov.io/5.Custom%20Policies/YAML%20Policies.html)
+- [Infracost](https://www.infracost.io/)
 
 ## 📄 License
 
 Educational use only.
+```

@@ -1,11 +1,19 @@
+# This is a custom Checkov policy to enforce tagging on AWS S3 buckets.
+# It checks that all S3 buckets have an "Owner" tag for cost allocation purposes.
+
+# Metadata section: Defines policy details like name, ID, category, and guidelines.
 metadata:
   name: "Ensure all S3 buckets have an Owner tag"
   id: "CKV_CUSTOM_1"
   category: "GENERAL_SECURITY"
   guidelines: "Every S3 bucket must have a tag named Owner for cost allocation."
+
+# Definition section: Specifies the logical condition for the policy.
+# Uses 'and' to combine conditions: filter by resource type and check for attribute existence.
 definition:
   and:
-    - cond_type: "attribute"
+    - # Condition to filter resources by type (only applies to aws_s3_bucket).
+      cond_type: "attribute"
       resource_types:
         - "aws_s3_bucket"
       attribute: "tags.Owner"
