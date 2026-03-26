@@ -5,7 +5,6 @@
 # - required_version: Specifies the minimum Terraform version required for compatibility.
 # - required_providers: Locks provider versions to ensure consistent and repeatable deployments,
 #   preventing unexpected upgrades that could introduce breaking changes.
-# - backend: Configures remote state storage in an S3 bucket for collaboration and state management.
 # --------------------------------------------------------
 terraform {
   required_version = ">= 1.14.0"
@@ -23,13 +22,6 @@ terraform {
       source  = "kreuzwerker/docker"
       version = "~> 3.6.0"
     }
-  }
-
-  backend "s3" {
-    bucket  = "nghia-homelab-tfstate-2026"
-    key     = "dev/homelab.tfstate"
-    region  = "us-east-1"
-    encrypt = true
   }
 }
 
