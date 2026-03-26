@@ -44,6 +44,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Checkov Action on local machine
+      - name: Run Checkov on local machine (with Custom Policies)
         run: |
-          checkov -d . --framework terraform --soft-fail
+          checkov -d . --external-checks-dir policies --framework terraform
