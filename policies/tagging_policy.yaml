@@ -6,11 +6,9 @@ scope:
   framework: terraform
 definition:
   and:
-    - cond_type: "filter"
-      value:
-        - "aws_s3_bucket"
-      operator: "within"
-      attribute: "resource_type"
-    - cond_type: "attribute"
-      attribute: "tags.Owner"
-      operator: "exists"
+    - filter:
+        resource_types:
+          - aws_s3_bucket
+    - attribute:
+        tags.Owner:
+          operator: exists
