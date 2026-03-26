@@ -1,0 +1,33 @@
+name: Hourly Drift Detection
+
+on:
+  schedule:
+    # Runs at the start of every hour
+    - cron: "0 * * * *"
+  # Allows you to trigger it manually for testing
+  workflow_dispatch:
+
+jobs:
+  drift-check:
+    runs-on: self-hosted
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: "us-east-1"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Terraform Init
+        # NOTE: For drift detection, we need the REAL backend, not backend=false
+        run: terraform init
+
+      - name: Check for Drift
+        id: drift
+        continue-on-error: true
+        run: |
+          # -detailed-exitcode returns:
+          # 0 = No Changes (Success)
+          # 2 = Drift Detected (Changes)
+          terraform plan -detailed-exitcode
