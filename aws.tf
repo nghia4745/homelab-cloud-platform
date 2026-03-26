@@ -13,18 +13,25 @@
 # -------------------------------------------------------
 resource "aws_instance" "web_server" {
   ami           = "ami-0c101f26f147fa7fd" # Standard Amazon Linux 2023 (us-east-1)
-  instance_type = "t3.micro"
+  instance_type = "t4g.micro"
 
   # Adding the Owner tag to satisfy your CKV_CUSTOM_1 policy!
   tags = {
     Name  = "Nghia-Web-Server"
     Owner = "Nghia"
+    Environemnt = "Dev"
+    Service = "Learning"
   }
 
   # Root block device (Storage) also has a cost!
   root_block_device {
     volume_size = 20
     volume_type = "gp3"
+    tags = {
+      Owner = "Nghia"
+      Environment = "Dev"
+      Service = "Learning"
+    }
   }
 }
 
