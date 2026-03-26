@@ -22,6 +22,13 @@ terraform {
       version = "~> 3.6.0"
     }
   }
+
+  backend "s3" {
+    bucket  = "nghia-homelab-tfstate-2026"
+    key     = "dev/homelab.tfstate"
+    region  = "us-east-1"
+    encrypt = true
+  }
 }
 
 provider "docker" {
