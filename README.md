@@ -1,6 +1,6 @@
 ```markdown
 # Terraform DevOps Learning Project
-![Security Scan](https://github.com/nghia4745/learn-terraform/actions/workflows/security-scan.yml/badge.svg)
+![Security Scan](https://github.com/nghia4745/homelab-cloud-platform/actions/workflows/security-scan.yml/badge.svg)
 
 A hands-on Terraform project demonstrating infrastructure-as-code concepts with Docker, Vault secret management, AWS resources, custom security policies, and CI/CD automation.
 
