@@ -1,14 +1,15 @@
 # This GitHub Actions workflow performs hourly drift detection on Terraform-managed infrastructure.
 # It checks for changes between the current state and the planned state, alerting if drift is detected.
 
-name: Hourly Drift Detection
+# name: Hourly Drift Detection
+name: Drift Detection (manual trigger)
 
 # Triggers: Runs automatically at the start of every hour via cron schedule.
 # Also allows manual triggering for testing purposes.
 on:
-  schedule:
-    # Runs at the start of every hour
-    - cron: "0 * * * *"
+  # schedule:
+  #   # Runs at the start of every hour
+  #   - cron: "0 * * * *"
   # Allows you to trigger it manually for testing
   workflow_dispatch:
 
