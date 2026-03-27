@@ -17,6 +17,8 @@ resource "vault_kv_secret_v2" "db_creds" {
   })
 }
 
+# TODO: Use ephemeral credentials with a lease instead of static credentials for better security practices
+# later on, ignore this deprecation warning for now as we are just demonstrating the concept of Vault integration in Terraform
 data "vault_kv_secret_v2" "db_creds" {
   depends_on = [vault_kv_secret_v2.db_creds]
 
