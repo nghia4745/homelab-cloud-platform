@@ -14,37 +14,7 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.37.0"
     }
-    vault = {
-      source  = "hashicorp/vault"
-      version = "~> 5.8.0"
-    }
-    docker = {
-      source  = "kreuzwerker/docker"
-      version = "~> 3.6.0"
-    }
   }
-}
-
-# --------------------------------------------------------
-# Docker Provider Configuration
-# --------------------------------------------------------
-# Configures the Docker provider to connect to the local Docker daemon via Unix socket.
-# This is typically used for managing Docker containers or images in local development.
-# --------------------------------------------------------
-provider "docker" {
-  host = "unix:///var/run/docker.sock"
-}
-
-# --------------------------------------------------------
-# Vault Provider Configuration
-# --------------------------------------------------------
-# Sets up the HashiCorp Vault provider for secrets management.
-# Uses a development token for local testing; in production, use proper authentication.
-# --------------------------------------------------------
-provider "vault" {
-  address          = "http://localhost:8200"
-  token            = "dev-token"
-  skip_child_token = true
 }
 
 # --------------------------------------------------------

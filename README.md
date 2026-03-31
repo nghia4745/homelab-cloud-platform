@@ -17,13 +17,13 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 
 ```
 .
-├── providers.tf           # Terraform settings & provider configurations
-├── main.tf                # Docker nginx application resources
-├── vault_docker.tf        # Docker Vault server resources
-├── vault.tf              # Vault secret management (KV V2)
-├── aws.tf                # AWS resources (S3 bucket + security group)
-├── variables.tf          # Input variable definitions
+├── providers.tf           # Root AWS provider configuration
+├── aws.tf                 # AWS resources (S3 bucket + security group)
 ├── secret.auto.tfvars    # Sensitive variables (auto-loaded, git-ignored)
+├── environments/
+│   └── local/
+│      ├── vault/         # Stack A: local Vault runtime (Docker)
+│      └── app/           # Stack B: Vault secrets + nginx app
 ├── policies/             # Custom Checkov security policies
 │   └── tagging_policy.yml # Enforces Owner tag on S3 buckets
 ├── .github/workflows/    # GitHub Actions CI/CD workflows
@@ -35,25 +35,23 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 
 ## 🚀 Quick Start
 
-### 1. Initialize Terraform
+### 1. Bootstrap Vault stack (Stack A)
 ```bash
-terraform init
+terraform -chdir=environments/local/vault init
+terraform -chdir=environments/local/vault plan
+terraform -chdir=environments/local/vault apply
 ```
-Downloads provider plugins and sets up the `.terraform/` directory.
+This creates and starts the local Vault container on port 8200.
 
-### 2. Plan the deployment
+### 2. Deploy app + secrets stack (Stack B)
 ```bash
-terraform plan
+terraform -chdir=environments/local/app init
+terraform -chdir=environments/local/app plan
+terraform -chdir=environments/local/app apply
 ```
-The `secret.auto.tfvars` file is automatically loaded, so no `-var-file` needed.
+This writes credentials into Vault and starts nginx with Vault-backed environment variables.
 
-### 3. Apply configuration
-```bash
-terraform apply
-```
-Creates Docker containers for Vault, nginx, and AWS resources.
-
-### 4. Verify resources
+### 3. Verify resources
 ```bash
 # Check running Docker containers
 docker ps
@@ -63,6 +61,12 @@ curl http://localhost:8200/v1/sys/health
 
 # Check nginx is running on port 8080
 curl http://localhost:8080
+```
+
+### 4. Destroy in reverse order
+```bash
+terraform -chdir=environments/local/app destroy
+terraform -chdir=environments/local/vault destroy
 ```
 
 ## 📦 What This Project Creates
@@ -154,8 +158,9 @@ terraform destroy
 - S3 bucket and security group are basic examples; production requires additional hardening
 
 ### Vault Integration
-- Vault container must start before secrets can be written
-- Terraform handles dependency ordering with `depends_on`
+- Use split stacks to avoid plan-time provider race conditions:
+  1) `environments/local/vault` starts Vault
+  2) `environments/local/app` writes/reads Vault secrets and starts the app
 - Token `dev-token` is hardcoded for dev mode only
 
 ### State Management

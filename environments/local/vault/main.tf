@@ -1,10 +1,3 @@
-# --------------------------------------------------------
-# Docker Vault server resources
-# --------------------------------------------------------
-# - docker_image: pulls/keeps the HashiCorp Vault image
-# - docker_container: starts Vault in dev mode with IPC_LOCK capability
-#   and exposes port 8200 for secret management operations
-# --------------------------------------------------------
 resource "docker_image" "vault" {
   name         = "hashicorp/vault:latest"
   keep_locally = true

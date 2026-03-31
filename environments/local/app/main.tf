@@ -1,9 +1,3 @@
-# --------------------------------------------------------
-# Docker app resources (nginx web server)
-# --------------------------------------------------------
-# - docker_image: pulls/keeps the nginx image
-# - docker_container: starts nginx container with port mappings + env vars
-# --------------------------------------------------------
 resource "docker_image" "nginx" {
   name         = "nginx:latest"
   keep_locally = false
