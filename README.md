@@ -35,6 +35,18 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 
 ## 🚀 Quick Start
 
+### One-command workflow (recommended)
+```bash
+make init
+make up
+```
+This initializes both stacks, applies Stack A first (Vault), then applies Stack B (app + secrets).
+
+To tear down everything in the correct order:
+```bash
+make down
+```
+
 ### 1. Bootstrap Vault stack (Stack A)
 ```bash
 terraform -chdir=environments/local/vault init
