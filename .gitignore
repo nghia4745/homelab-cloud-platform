@@ -4,3 +4,4 @@
 *.tfvars
 *.auto.tfvars
 terraform.tfvars
+.vscode/
