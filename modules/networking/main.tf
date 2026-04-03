@@ -27,10 +27,9 @@ resource "aws_vpc" "this" {
 resource "aws_subnet" "public" {
   for_each = zipmap(var.azs, var.public_subnet_cidrs)
 
-  vpc_id                  = aws_vpc.this.id
-  cidr_block              = each.value
-  availability_zone       = each.key
-  map_public_ip_on_launch = true
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = each.value
+  availability_zone = each.key
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-public-${each.key}"
@@ -136,11 +135,11 @@ resource "aws_security_group" "cluster" {
   }
 
   egress {
-    description = "Allow all outbound traffic"
+    description = "Allow all outbound traffic to worker nodes"
     from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = var.node_security_group_ingress_cidrs
   }
 
   tags = merge(local.common_tags, {
