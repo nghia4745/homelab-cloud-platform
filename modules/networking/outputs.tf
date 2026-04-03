@@ -1,4 +1,6 @@
 # Networking Module Outputs
+# Outputs are the module's public API. Callers cannot see internal resources directly,
+# so expose only the values other modules need, such as IDs for EKS and IAM wiring.
 
 output "vpc_id" {
   description = "ID of the VPC"

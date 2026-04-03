@@ -143,6 +143,37 @@ infracost breakdown --path=.
 - **Custom Policies**: Writing and applying Checkov security checks
 - **CI/CD**: Automating scans, cost estimation, and drift detection
 
+## 🌐 Networking Module Notes
+
+The `modules/networking` module was built as a learning exercise to turn Terraform inputs into a reusable AWS network foundation for EKS.
+
+What it creates:
+- A VPC with DNS support enabled.
+- Public and private subnets across multiple Availability Zones.
+- An Internet Gateway for public internet routing.
+- Optional NAT Gateway infrastructure so private subnets can reach the internet without becoming publicly addressable.
+- Public and private route tables with subnet associations.
+- EKS-oriented security groups for the cluster control plane and worker nodes.
+
+What to remember about the design:
+- `variables.tf` defines the module contract. These are the values the caller must provide, such as CIDR ranges and AZs.
+- `main.tf` contains the implementation. All resources in the same module directory share one Terraform namespace, so resources, locals, and variables can reference one another directly.
+- `outputs.tf` defines the module's public API. Other modules do not see internal resources unless they are exposed as outputs.
+- `locals` are internal helper values, not caller inputs. They were used here to keep naming and tagging consistent and to avoid repeating the NAT gateway count logic.
+- `merge()` was used for tags so module-wide defaults can be reused everywhere, while resource-specific tags like `Name` can override or extend those defaults.
+
+Networking concepts captured in this module:
+- A subnet is "public" because its route table sends `0.0.0.0/0` to an Internet Gateway, not because every resource in it gets a public IP.
+- Private subnets are kept private by avoiding direct internet routing; when NAT is enabled, they get outbound internet access through the NAT Gateway instead.
+- Ingress means traffic coming into a resource; egress means traffic leaving a resource.
+- TCP port ranges matter in security groups. Port `443` is a precise service port, while `0-65535` means the full TCP range, including ephemeral ports used for response traffic and dynamic workloads.
+- CIDR blocks define IP ranges. The VPC CIDR is the full address space, and subnet CIDRs are smaller, non-overlapping slices inside it.
+
+Implementation choices made during the exercise:
+- Public subnets do not auto-assign public IPs by default. That keeps internet exposure explicit at the workload level instead of implicit at the subnet level.
+- The NAT gateway count is driven by a local expression so the module can support either a single shared NAT for lower cost or one NAT per AZ for stronger availability.
+- Security group rules were tightened after Checkov feedback so the defaults are less permissive and easier to reason about.
+
 ## 🧹 Useful Commands
 
 ```bash

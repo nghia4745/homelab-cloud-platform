@@ -1,4 +1,6 @@
 # Networking Module Variables
+# These are the inputs to the module. Callers provide environment-specific values,
+# and the resources in main.tf turn those inputs into actual AWS networking.
 
 variable "project_name" {
   description = "Project identifier used in naming"
