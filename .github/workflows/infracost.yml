@@ -28,7 +28,7 @@ jobs:
       # Step 2: Generate Infracost cost estimate for the base branch.
       - name: Generate Infracost cost estimate baseline
         run: |
-          infracost breakdown --path=. \
+          infracost breakdown --path=environments/local \
                             --format=json \
                             --out-file=/tmp/infracost-base.json
 
@@ -39,7 +39,7 @@ jobs:
       # Step 4: Generate the cost difference between base and PR branches.
       - name: Generate Infracost diff
         run: |
-          infracost diff --path=. \
+          infracost diff --path=environments/local \
                         --format=json \
                         --compare-to=/tmp/infracost-base.json \
                         --out-file=/tmp/infracost.json

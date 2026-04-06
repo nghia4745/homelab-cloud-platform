@@ -27,20 +27,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2: Initialize Terraform with the real backend for state management.
-      - name: Terraform Init
-        # NOTE: For drift detection, we need the REAL backend, not backend=false
-        run: terraform init
+      # Step 2: Initialize local Vault stack backend/providers.
+      - name: Terraform Init (local vault)
+        run: terraform -chdir=environments/local/vault init
 
-      # Step 3: Run Terraform plan to check for drift.
-      # -detailed-exitcode returns:
-      # 0 = No Changes (Success)
-      # 2 = Drift Detected (Changes)
-      - name: Check for Drift
+      # Step 3: Initialize local app stack backend/providers.
+      - name: Terraform Init (local app)
+        run: terraform -chdir=environments/local/app init
+
+      # Step 4: Run plan on both local stacks and return detailed drift signal.
+      # Exit codes:
+      # 0 = no changes, 2 = drift detected, 1 = error
+      - name: Check for Drift (local vault + local app)
         id: drift
         continue-on-error: true
         run: |
-          # -detailed-exitcode returns:
-          # 0 = No Changes (Success)
-          # 2 = Drift Detected (Changes)
-          terraform plan -detailed-exitcode
+          set +e
+
+          terraform -chdir=environments/local/vault plan -detailed-exitcode
+          VAULT_EXIT=$?
+
+          terraform -chdir=environments/local/app plan -detailed-exitcode
+          APP_EXIT=$?
+
+          if [ "$VAULT_EXIT" -eq 1 ] || [ "$APP_EXIT" -eq 1 ]; then
+            exit 1
+          fi
+
+          if [ "$VAULT_EXIT" -eq 2 ] || [ "$APP_EXIT" -eq 2 ]; then
+            exit 2
+          fi
+
+          exit 0
