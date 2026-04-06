@@ -1,5 +1,6 @@
 # IAM Module Variables
-# Inputs used to create EKS IAM roles and policy attachments
+# These are the caller-provided inputs for naming, environment scoping, and tagging.
+# IAM itself is global within an AWS account, so these values help keep roles organized.
 
 variable "project_name" {
   description = "Project identifier used in naming"

@@ -174,6 +174,34 @@ Implementation choices made during the exercise:
 - The NAT gateway count is driven by a local expression so the module can support either a single shared NAT for lower cost or one NAT per AZ for stronger availability.
 - Security group rules were tightened after Checkov feedback so the defaults are less permissive and easier to reason about.
 
+## 🔐 IAM Module Notes
+
+The `modules/iam` module was built to provide the AWS identities required by EKS.
+
+What it creates:
+- One IAM role for the EKS control plane.
+- One IAM role for EKS worker nodes.
+- AWS-managed policy attachments for cluster management, worker node operations, image pulls from ECR, and CNI networking.
+
+What to remember about the design:
+- IAM roles have two separate concerns:
+  - Trust policy: who is allowed to assume the role.
+  - Permission policies: what that role is allowed to do after assumption.
+- In Terraform, `aws_iam_policy_document` is used to generate trust policy JSON safely instead of embedding raw JSON strings.
+- The EKS cluster role trusts `eks.amazonaws.com` because the control plane service assumes it.
+- The EKS node role trusts `ec2.amazonaws.com` because worker nodes are EC2 instances.
+- AWS-managed policies were used first because they are the fastest safe path to a working baseline; custom policies can come later when permissions need to be narrowed.
+
+Module structure reminders:
+- `variables.tf` defines the IAM module inputs: project naming, environment scoping, and tags.
+- `main.tf` builds the trust policies, roles, and policy attachments.
+- `outputs.tf` exposes names and ARNs so other modules can consume the roles without depending on IAM internals.
+
+Implementation choices made during the exercise:
+- Naming follows the same `project-environment` prefix pattern as the networking module so resources are easy to trace in AWS.
+- Tags are merged through locals for consistency and to avoid repeating metadata on every role.
+- Both role names and ARNs are output because downstream modules often need ARNs for resource arguments, while names are still useful for inspection and debugging.
+
 ## 🧹 Useful Commands
 
 ```bash
