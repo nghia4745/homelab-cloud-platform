@@ -1,6 +1,12 @@
 # Dev environment module wiring
-# This stack composes reuseable modules into one deployable environment.
+# This file is the composition layer: it calls reusable modules and passes
+# environment-specific values from variables.tf. No AWS resources are defined
+# here directly — all that logic lives inside each module.
 
+# ── Networking ────────────────────────────────────────────────────────────────
+# Creates the VPC, subnets (public and private), Internet Gateway, optional
+# NAT Gateways, route tables, and the EKS-oriented cluster/node security groups.
+# All CIDR ranges and AZ assignments come from dev.auto.tfvars.
 module "networking" {
   source = "../../modules/networking"
 
@@ -21,6 +27,10 @@ module "networking" {
   tags = var.tags
 }
 
+# ── IAM ───────────────────────────────────────────────────────────────────────
+# Creates the EKS cluster IAM role and worker node IAM role, plus the required
+# AWS-managed policy attachments for each. These roles are prerequisite inputs
+# for the EKS module (planned next) which provisions the control plane and node groups.
 module "iam" {
   source = "../../modules/iam"
 

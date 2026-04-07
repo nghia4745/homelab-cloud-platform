@@ -9,7 +9,7 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 - Terraform >= 1.14.0
 - Docker (running locally)
 - HashiCorp Vault (started via Terraform)
-- AWS credentials (for mock AWS resources)
+- AWS credentials configured (`~/.aws/credentials` or environment variables) for real AWS resource provisioning
 - Checkov (for custom security policies)
 - Infracost (for cost estimation, optional for CI/CD)
 
@@ -17,20 +17,30 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 
 ```
 .
-├── providers.tf           # Root AWS provider configuration
-├── aws.tf                 # AWS resources (S3 bucket + security group)
-├── secret.auto.tfvars    # Sensitive variables (auto-loaded, git-ignored)
 ├── environments/
-│   └── local/
-│      ├── vault/         # Stack A: local Vault runtime (Docker)
-│      └── app/           # Stack B: Vault secrets + nginx app
-├── policies/             # Custom Checkov security policies
-│   └── tagging_policy.yml # Enforces Owner tag on S3 buckets
-├── .github/workflows/    # GitHub Actions CI/CD workflows
-│   ├── security-scan.yml # Runs Checkov security scans
-│   ├── infracost.yml     # Estimates infrastructure costs on PRs
-│   └── drift-detection.yml # Hourly drift detection via Terraform plan
-└── README.md             # This file
+│   ├── local/
+│   │   ├── vault/                 # Stack A: local Vault runtime (Docker)
+│   │   └── app/                   # Stack B: Vault secrets + nginx app
+│   └── dev/                       # Stack C: real AWS dev environment
+│       ├── providers.tf           # AWS provider + version constraints
+│       ├── backend.tf             # Remote state (S3 + DynamoDB locking)
+│       ├── variables.tf           # Environment-level variable declarations
+│       ├── main.tf                # Module wiring — networking and IAM
+│       ├── outputs.tf             # Re-exports module outputs after apply
+│       └── dev.auto.tfvars        # Concrete values (auto-loaded by Terraform)
+├── modules/
+│   ├── networking/                # VPC, subnets, IGW, NAT, route tables, SGs
+│   ├── iam/                       # EKS cluster and node IAM roles + policy attachments
+│   ├── ecr/                       # (planned) container image registry
+│   └── eks/                       # (planned) EKS cluster and node groups
+├── policies/                      # Custom Checkov security policies
+│   └── tagging_policy.yml         # Enforces Owner tag on S3 buckets
+├── .github/workflows/             # GitHub Actions CI/CD workflows
+│   ├── security-scan.yml          # Runs Checkov security scans
+│   ├── infracost.yml              # Estimates infrastructure costs on PRs
+│   └── drift-detection.yml        # Hourly drift detection via Terraform plan
+├── Makefile                       # Convenience targets for local stacks
+└── README.md                      # This file
 ```
 
 ## 🚀 Quick Start
@@ -81,6 +91,22 @@ terraform -chdir=environments/local/app destroy
 terraform -chdir=environments/local/vault destroy
 ```
 
+### Dev environment (real AWS)
+
+Ensure AWS credentials are configured, then:
+```bash
+terraform -chdir=environments/dev init
+terraform -chdir=environments/dev plan
+terraform -chdir=environments/dev apply
+```
+
+> ⚠️ This creates real AWS resources that may incur charges. Review the plan output before confirming.
+
+To clean up:
+```bash
+terraform -chdir=environments/dev destroy
+```
+
 ## 📦 What This Project Creates
 
 ### Docker Resources
@@ -95,13 +121,20 @@ terraform -chdir=environments/local/vault destroy
   - Username: `admin_duke`
   - Password: from `secret.auto.tfvars`
 
-### AWS Resources (Mock)
-- **S3 Bucket**: `my-secure-data-bucket-2026` with encryption and public access blocking
-  - Server-side encryption enabled (AES256)
-  - All public access blocked
-- **Security Group**: `allow_web_only` restricted to HTTP traffic
-  - Ingress: Allows port 80 (HTTP) only
-  - Egress: Allows all outbound traffic
+### AWS Resources (Dev Environment)
+
+The `environments/dev` stack provisions real AWS resources using the `modules/networking` and `modules/iam` modules.
+
+- **VPC**: `10.0.0.0/16` with DNS hostname support enabled
+- **Public subnets**: one per AZ across `us-east-1a` and `us-east-1b` (for load balancers and internet-facing traffic)
+- **Private subnets**: one per AZ across `us-east-1a` and `us-east-1b` (for EKS worker nodes)
+- **Internet Gateway**: attached to the VPC for public subnet outbound routing
+- **Route tables**: separate public and private route tables with explicit subnet associations
+- **Security groups**:
+  - Cluster SG: ingress port 443 (EKS control plane API), egress TCP 0–65535 to node CIDR
+  - Node SG: ingress TCP 0–65535 (ephemeral ports for workload response traffic)
+- **IAM role — EKS cluster**: trusted by `eks.amazonaws.com`, attached `AmazonEKSClusterPolicy`
+- **IAM role — EKS nodes**: trusted by `ec2.amazonaws.com`, attached `AmazonEKSWorkerNodePolicy`, `AmazonEC2ContainerRegistryReadOnly`, `AmazonEKS_CNI_Policy`
 
 ## 🔐 Configuration
 
@@ -136,12 +169,19 @@ infracost breakdown --path=.
 
 - **Providers**: Docker, Vault, and AWS plugin configuration
 - **Resources**: Creating and managing infrastructure objects
-- **Data Sources**: Reading existing Vault secrets
+- **Data Sources**: Reading existing Vault secrets and generating IAM policy JSON via `aws_iam_policy_document`
 - **Dependencies**: Explicit `depends_on` for sequencing resource creation
 - **Variables**: Sensitive input variables for credentials
 - **Interpolation**: Referencing resource outputs and data source values
 - **Custom Policies**: Writing and applying Checkov security checks
 - **CI/CD**: Automating scans, cost estimation, and drift detection
+- **Modules**: Reusable, self-contained infrastructure units with a variables / main / outputs contract
+- **`locals`**: Internal helper values that keep logic DRY without exposing extra variables to callers
+- **`for_each` and `count`**: Creating multiple similar resources from a single block
+- **`dynamic` blocks**: Conditionally including nested resource arguments (e.g. NAT routes only when NAT is enabled)
+- **`merge()` and `zipmap()`**: Combining tag maps and building maps from parallel key/value lists
+- **Remote state**: S3 backend with DynamoDB state locking for safe concurrent operations
+- **Split-stack architecture**: Separate Terraform stacks that avoid provider dependency cycles by running independently
 
 ## 🌐 Networking Module Notes
 
@@ -224,9 +264,10 @@ terraform destroy
 ## ⚠️ Important Notes
 
 ### Development Only
-- AWS provider uses mock credentials (not real AWS access)
-- Vault runs in dev mode (not production-safe)
-- S3 bucket and security group are basic examples; production requires additional hardening
+- The **local** stacks (`environments/local/`) are Docker-only and do not touch AWS.
+- The **dev** stack (`environments/dev/`) uses real AWS credentials and creates real AWS resources. Check your AWS account for billable resources before running `apply`.
+- Vault runs in dev mode (not production-safe); tokens and secrets are ephemeral and lost on container restart.
+- The dev stack currently disables NAT gateways (`enable_nat_gateway = false`) to minimise cost. Private subnets have no outbound internet until NAT is re-enabled.
 
 ### Vault Integration
 - Use split stacks to avoid plan-time provider race conditions:
@@ -235,8 +276,8 @@ terraform destroy
 - Token `dev-token` is hardcoded for dev mode only
 
 ### State Management
-- Currently uses local state (`.terraform/tfstate`)
-- For production: migrate to remote backend (S3, Azure, GCS, etc.)
+- The **local** stacks use local state files stored under `.terraform/` within each stack directory.
+- The **dev** stack uses an S3 remote backend (`nghia-homelab-tfstate-2026`) with DynamoDB state locking (`nghia-homelab-tfstate-lock`). Each stack writes to a unique key (`dev/homelab.tfstate`, `local/vault/local-vault.tfstate`, etc.) so multiple stacks can share the same bucket without colliding.
 
 ## 🎓 Learning Resources
 
