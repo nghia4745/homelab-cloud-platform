@@ -16,6 +16,10 @@ locals {
 
   # One NAT for cost efficiency in dev, or one per AZ for stronger HA.
   nat_gateway_count = var.enable_nat_gateway ? (var.single_nat_gateway ? 1 : length(var.azs)) : 0
+
+  # Private subnets should always have an explicit private route table.
+  # When NAT is disabled, they still get a route table, just without an internet route.
+  private_route_table_count = var.enable_nat_gateway ? local.nat_gateway_count : 1
 }
 
 # The VPC is the top-level network boundary. Everything else in this module lives inside it.
@@ -115,15 +119,20 @@ resource "aws_route_table_association" "public" {
 }
 
 # Private route tables either share one NAT route or get one route table per AZ,
-# depending on the single_nat_gateway setting.
+# depending on the single_nat_gateway setting. If NAT is disabled, one shared
+# private route table is still created so private subnets keep explicit routing.
 resource "aws_route_table" "private" {
-  count = local.nat_gateway_count
+  count = local.private_route_table_count
 
   vpc_id = aws_vpc.this.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this[count.index].id
+  dynamic "route" {
+    for_each = var.enable_nat_gateway ? [1] : []
+
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.this[count.index].id
+    }
   }
 
   tags = merge(local.common_tags, {
@@ -135,7 +144,7 @@ resource "aws_route_table_association" "private" {
   count = length(var.azs)
 
   subnet_id      = values(aws_subnet.private)[count.index].id
-  route_table_id = var.single_nat_gateway ? aws_route_table.private[0].id : aws_route_table.private[count.index].id
+  route_table_id = (!var.enable_nat_gateway || var.single_nat_gateway) ? aws_route_table.private[0].id : aws_route_table.private[count.index].id
 }
 
 # These security groups are EKS-oriented defaults kept here for learning purposes.
