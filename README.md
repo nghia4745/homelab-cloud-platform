@@ -242,6 +242,31 @@ Implementation choices made during the exercise:
 - Tags are merged through locals for consistency and to avoid repeating metadata on every role.
 - Both role names and ARNs are output because downstream modules often need ARNs for resource arguments, while names are still useful for inspection and debugging.
 
+## 📦 ECR Module Notes
+
+The `modules/ecr` module provides a reusable pattern for container image repositories.
+
+What it creates:
+- One ECR repository per logical name in `repository_names`.
+- Optional image scanning on push.
+- Caller-controlled tag mutability (`MUTABLE` or `IMMUTABLE`).
+
+What to remember about the design:
+- Repository names are generated with a `project-environment` prefix for consistency across modules.
+- `for_each = toset(var.repository_names)` creates one independent Terraform object per repo name, so references stay stable.
+- `force_delete = true` is intentionally set for learning and dev workflows to make `terraform destroy` reliable even when images exist.
+- Outputs are maps keyed by logical repository names, which makes downstream usage predictable.
+
+Module structure reminders:
+- `variables.tf` defines naming context, repository list, scanning behavior, tag mutability, and shared tags.
+- `main.tf` creates repositories and applies consistent tags.
+- `outputs.tf` exposes names, ARNs, and repository URLs for consumers.
+
+Implementation choices made during the exercise:
+- Default `image_tag_mutability` is `MUTABLE`, which is practical for iterative development and frequent image pushes.
+- Default `scan_on_push` is `false` to keep behavior simple by default; it can be enabled per environment.
+- Repository outputs are exposed as maps rather than lists to avoid order-coupling and simplify module consumers.
+
 ## 🧹 Useful Commands
 
 ```bash
