@@ -33,23 +33,6 @@ variable "repository_names" {
   }
 }
 
-variable "image_tag_mutability" {
-  description = "Tag overwrite policy for images: MUTABLE or IMMUTABLE"
-  type        = string
-  default     = "MUTABLE"
-
-  validation {
-    condition     = contains(["MUTABLE", "IMMUTABLE"], var.image_tag_mutability)
-    error_message = "image_tag_mutability must be either MUTABLE or IMMUTABLE."
-  }
-}
-
-variable "scan_on_push" {
-  description = "Enable basic vulnerability scanning when images are pushed"
-  type        = bool
-  default     = false
-}
-
 variable "force_delete" {
   description = "Allow Terraform to delete repositories that still contain images. Safe for dev/test; leave false for production."
   type        = bool

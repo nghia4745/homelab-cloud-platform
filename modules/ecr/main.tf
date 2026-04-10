@@ -20,12 +20,17 @@ resource "aws_ecr_repository" "this" {
   for_each = toset(var.repository_names)
 
   name                 = "${local.name_prefix}-${each.value}"
-  image_tag_mutability = var.image_tag_mutability
+  image_tag_mutability = "IMMUTABLE"
   force_delete         = var.force_delete
 
   # scan_on_push enables ECR's image scanning integration on each push.
   image_scanning_configuration {
-    scan_on_push = var.scan_on_push
+    scan_on_push = true
+  }
+
+  # encryption_configuration with KMS is a best practice for production workloads.
+  encryption_configuration {
+    encryption_type = "KMS"
   }
 
   tags = merge(local.common_tags, {

@@ -135,7 +135,7 @@ The `environments/dev` stack provisions real AWS resources using the `modules/ne
   - Node SG: ingress TCP 0–65535 (ephemeral ports for workload response traffic)
 - **IAM role — EKS cluster**: trusted by `eks.amazonaws.com`, attached `AmazonEKSClusterPolicy`
 - **IAM role — EKS nodes**: trusted by `ec2.amazonaws.com`, attached `AmazonEKSWorkerNodePolicy`, `AmazonEC2ContainerRegistryReadOnly`, `AmazonEKS_CNI_Policy`
-- **ECR repositories**: environment-scoped image registries (currently `app` and `worker`) with mutable tags and scan-on-push enabled in dev
+- **ECR repositories**: environment-scoped image registries (currently `app` and `worker`) with mutable tags
 
 ## 🔐 Configuration
 
@@ -148,7 +148,7 @@ db_password = "your-secure-password-here"
 > ⚠️ **Security Note**: `secret.auto.tfvars` is auto-loaded and should be git-ignored. Keep sensitive values out of version control.
 
 For AWS dev stack values, edit `environments/dev/dev.auto.tfvars`.
-This controls networking, IAM wiring context, and ECR behavior (repository names, tag mutability, and scan-on-push).
+This controls networking, IAM wiring context, and ECR behavior (repository names).
 
 ## 🛡️ Security & CI/CD
 
@@ -252,8 +252,6 @@ The `modules/ecr` module provides a reusable pattern for container image reposit
 
 What it creates:
 - One ECR repository per logical name in `repository_names`.
-- Optional image scanning on push.
-- Caller-controlled tag mutability (`MUTABLE` or `IMMUTABLE`).
 
 What to remember about the design:
 - Repository names are generated with a `project-environment` prefix for consistency across modules.
@@ -262,13 +260,11 @@ What to remember about the design:
 - Outputs are maps keyed by logical repository names, which makes downstream usage predictable.
 
 Module structure reminders:
-- `variables.tf` defines naming context, repository list, scanning behavior, tag mutability, and shared tags.
+- `variables.tf` defines naming context, repository list, scanning behavior, and shared tags.
 - `main.tf` creates repositories and applies consistent tags.
 - `outputs.tf` exposes names, ARNs, and repository URLs for consumers.
 
 Implementation choices made during the exercise:
-- Default `image_tag_mutability` is `MUTABLE`, which is practical for iterative development and frequent image pushes.
-- Default `scan_on_push` is `false` to keep behavior simple by default; it can be enabled per environment.
 - Repository outputs are exposed as maps rather than lists to avoid order-coupling and simplify module consumers.
 
 ## 🧹 Useful Commands
