@@ -44,7 +44,13 @@ jobs:
                         --compare-to=/tmp/infracost-base.json \
                         --out-file=/tmp/infracost.json
 
-      # Step 5: Post the cost estimate as a comment on the pull request.
+      # Step 5: Print a readable cost summary to the workflow logs.
+      - name: Print Infracost summary in logs
+        run: |
+          echo "Infracost diff summary"
+          infracost output --path=/tmp/infracost.json --format=table
+
+      # Step 6: Post the cost estimate as a comment on the pull request.
       - name: Post Infracost comment
         run: |
           infracost comment github --path=/tmp/infracost.json \
