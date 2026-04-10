@@ -293,7 +293,7 @@ terraform destroy
 ## ⚠️ Important Notes
 
 ### Development Only
-- The **local** stacks (`environments/local/`) are Docker-only and do not touch AWS.
+- The **local** stacks (`environments/local/`) run Docker containers locally but **do** require AWS credentials because their Terraform state is stored in the same S3 remote backend as the dev stack.
 - The **dev** stack (`environments/dev/`) uses real AWS credentials and creates real AWS resources. Check your AWS account for billable resources before running `apply`.
 - Vault runs in dev mode (not production-safe); tokens and secrets are ephemeral and lost on container restart.
 - The dev stack currently disables NAT gateways (`enable_nat_gateway = false`) to minimise cost. Private subnets have no outbound internet until NAT is re-enabled.
@@ -305,8 +305,7 @@ terraform destroy
 - Token `dev-token` is hardcoded for dev mode only
 
 ### State Management
-- The **local** stacks use local state files stored under `.terraform/` within each stack directory.
-- The **dev** stack uses an S3 remote backend (`nghia-homelab-tfstate-2026`) with DynamoDB state locking (`nghia-homelab-tfstate-lock`). Each stack writes to a unique key (`dev/homelab.tfstate`, `local/vault/local-vault.tfstate`, etc.) so multiple stacks can share the same bucket without colliding.
+- All stacks (**local** and **dev**) use the same S3 remote backend (`nghia-homelab-tfstate-2026`) with DynamoDB state locking (`nghia-homelab-tfstate-lock`). Each stack writes to a unique key (`dev/homelab.tfstate`, `local/local-vault.tfstate`, `local/local-app.tfstate`, etc.) so multiple stacks can share the same bucket without colliding.
 
 ## 🎓 Learning Resources
 
