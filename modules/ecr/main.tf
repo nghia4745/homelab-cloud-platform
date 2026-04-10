@@ -21,8 +21,7 @@ resource "aws_ecr_repository" "this" {
 
   name                 = "${local.name_prefix}-${each.value}"
   image_tag_mutability = var.image_tag_mutability
-  # In learning/dev environments we often destroy frequently; this avoids manual image cleanup.
-  force_delete = true
+  force_delete         = var.force_delete
 
   # scan_on_push enables ECR's image scanning integration on each push.
   image_scanning_configuration {

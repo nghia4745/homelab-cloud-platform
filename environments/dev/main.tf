@@ -52,6 +52,7 @@ module "ecr" {
   repository_names     = var.ecr_repository_names
   image_tag_mutability = var.ecr_image_tag_mutability
   scan_on_push         = var.ecr_scan_on_push
+  force_delete         = var.ecr_force_delete
 
   tags = var.tags
 }

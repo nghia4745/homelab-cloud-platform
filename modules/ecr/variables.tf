@@ -50,6 +50,12 @@ variable "scan_on_push" {
   default     = false
 }
 
+variable "force_delete" {
+  description = "Allow Terraform to delete repositories that still contain images. Safe for dev/test; leave false for production."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to the ECR repositories"
   type        = map(string)

@@ -96,3 +96,9 @@ variable "ecr_scan_on_push" {
   type        = bool
   default     = false
 }
+
+variable "ecr_force_delete" {
+  description = "Allow Terraform to delete ECR repositories that still contain images (convenient for dev, keep false for production)"
+  type        = bool
+  default     = true
+}
