@@ -25,13 +25,13 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │       ├── providers.tf           # AWS provider + version constraints
 │       ├── backend.tf             # Remote state (S3 + DynamoDB locking)
 │       ├── variables.tf           # Environment-level variable declarations
-│       ├── main.tf                # Module wiring — networking and IAM
+│       ├── main.tf                # Module wiring — networking, IAM, and ECR
 │       ├── outputs.tf             # Re-exports module outputs after apply
 │       └── dev.auto.tfvars        # Concrete values (auto-loaded by Terraform)
 ├── modules/
 │   ├── networking/                # VPC, subnets, IGW, NAT, route tables, SGs
 │   ├── iam/                       # EKS cluster and node IAM roles + policy attachments
-│   ├── ecr/                       # (planned) container image registry
+│   ├── ecr/                       # Container image repositories for workloads
 │   └── eks/                       # (planned) EKS cluster and node groups
 ├── policies/                      # Custom Checkov security policies
 │   └── tagging_policy.yml         # Enforces Owner tag on S3 buckets
@@ -123,7 +123,7 @@ terraform -chdir=environments/dev destroy
 
 ### AWS Resources (Dev Environment)
 
-The `environments/dev` stack provisions real AWS resources using the `modules/networking` and `modules/iam` modules.
+The `environments/dev` stack provisions real AWS resources using the `modules/networking`, `modules/iam`, and `modules/ecr` modules.
 
 - **VPC**: `10.0.0.0/16` with DNS hostname support enabled
 - **Public subnets**: one per AZ across `us-east-1a` and `us-east-1b` (for load balancers and internet-facing traffic)
@@ -135,6 +135,7 @@ The `environments/dev` stack provisions real AWS resources using the `modules/ne
   - Node SG: ingress TCP 0–65535 (ephemeral ports for workload response traffic)
 - **IAM role — EKS cluster**: trusted by `eks.amazonaws.com`, attached `AmazonEKSClusterPolicy`
 - **IAM role — EKS nodes**: trusted by `ec2.amazonaws.com`, attached `AmazonEKSWorkerNodePolicy`, `AmazonEC2ContainerRegistryReadOnly`, `AmazonEKS_CNI_Policy`
+- **ECR repositories**: environment-scoped image registries (currently `app` and `worker`) with mutable tags and scan-on-push enabled in dev
 
 ## 🔐 Configuration
 
@@ -145,6 +146,9 @@ db_password = "your-secure-password-here"
 ```
 
 > ⚠️ **Security Note**: `secret.auto.tfvars` is auto-loaded and should be git-ignored. Keep sensitive values out of version control.
+
+For AWS dev stack values, edit `environments/dev/dev.auto.tfvars`.
+This controls networking, IAM wiring context, and ECR behavior (repository names, tag mutability, and scan-on-push).
 
 ## 🛡️ Security & CI/CD
 

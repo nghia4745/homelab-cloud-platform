@@ -39,3 +39,19 @@ module "iam" {
 
   tags = var.tags
 }
+
+# ── ECR ───────────────────────────────────────────────────────────────────────
+# Creates image repositories used by workloads and CI image publishing.
+# Keeping this separate from EKS lets you provision image storage early.
+module "ecr" {
+  source = "../../modules/ecr"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  repository_names     = var.ecr_repository_names
+  image_tag_mutability = var.ecr_image_tag_mutability
+  scan_on_push         = var.ecr_scan_on_push
+
+  tags = var.tags
+}
