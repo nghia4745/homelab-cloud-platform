@@ -1,4 +1,9 @@
 # Dev environment variables
+# This file defines the input contract for the dev stack.
+# Values are typically provided via dev.auto.tfvars and then passed from
+# environments/dev/main.tf into reusable modules.
+
+# Core environment identity and provider settings
 
 variable "project_name" {
   description = "Project identifier used in naming"
@@ -15,6 +20,16 @@ variable "aws_region" {
   description = "AWS region for the dev environment"
   type        = string
 }
+
+# Shared tagging metadata passed through to all modules
+
+variable "tags" {
+  description = "Common tags to apply to all resources"
+  type        = map(string)
+  default     = {}
+}
+
+# Networking inputs consumed by modules/networking
 
 variable "vpc_cidr" {
   description = "CIDR block for VPC"
@@ -48,6 +63,8 @@ variable "single_nat_gateway" {
   default     = true
 }
 
+# Security group source ranges for cluster and worker node traffic
+
 variable "cluster_security_group_ingress_cidrs" {
   description = "CIDRs allowed to reach EKS control plane SG"
   type        = list(string)
@@ -60,8 +77,16 @@ variable "node_security_group_ingress_cidrs" {
   default     = ["10.0.0.0/8"]
 }
 
-variable "tags" {
-  description = "Common tags to apply to all resources"
-  type        = map(string)
-  default     = {}
+# ECR module inputs (repository names and image behavior)
+
+variable "ecr_repository_names" {
+  description = "Logical ECR repository names to create (for example: app, worker)"
+  type        = list(string)
+  default     = ["app"]
+}
+
+variable "ecr_force_delete" {
+  description = "Allow Terraform to delete ECR repositories that still contain images (convenient for dev, keep false for production)"
+  type        = bool
+  default     = true
 }

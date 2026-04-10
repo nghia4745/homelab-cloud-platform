@@ -1,5 +1,6 @@
 # Dev environment outputs
-# Re-export key values from networking and IAM modules so they are visible after apply.
+# Re-export key values from modules to make them visible after apply
+# so downstream tooling can push/pull without reading module internals
 
 output "vpc_id" {
   description = "VPC ID created by networking module"
@@ -34,4 +35,14 @@ output "eks_cluster_role_arn" {
 output "eks_node_role_arn" {
   description = "EKS node IAM role ARN from IAM module"
   value       = module.iam.eks_node_role_arn
+}
+
+output "ecr_repository_urls" {
+  description = "ECR repository URLs from ECR module"
+  value       = module.ecr.repository_urls
+}
+
+output "ecr_repository_arns" {
+  description = "ECR repository ARNs from ECR module"
+  value       = module.ecr.repository_arns
 }

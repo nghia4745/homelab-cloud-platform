@@ -1,4 +1,7 @@
 # Dev environment backend configuration
+# Remote state is stored in S3 (durable, versioned) and locked via DynamoDB so
+# concurrent applies cannot corrupt state. The unique key per stack (dev/homelab.tfstate)
+# means all environments can share the same bucket and lock table without colliding.
 
 terraform {
   backend "s3" {

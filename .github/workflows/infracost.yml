@@ -17,6 +17,7 @@ jobs:
 
     env:
       INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+      INFRACOST_TERRAFORM_INIT_FLAGS: "-backend=false"
 
     steps:
       # Step 1: Checkout the base branch to generate a baseline cost estimate.
@@ -28,7 +29,7 @@ jobs:
       # Step 2: Generate Infracost cost estimate for the base branch.
       - name: Generate Infracost cost estimate baseline
         run: |
-          infracost breakdown --path=environments/local \
+          infracost breakdown --path=environments/dev \
                             --format=json \
                             --out-file=/tmp/infracost-base.json
 
@@ -39,16 +40,23 @@ jobs:
       # Step 4: Generate the cost difference between base and PR branches.
       - name: Generate Infracost diff
         run: |
-          infracost diff --path=environments/local \
+          infracost diff --path=environments/dev \
                         --format=json \
                         --compare-to=/tmp/infracost-base.json \
                         --out-file=/tmp/infracost.json
 
-      # Step 5: Post the cost estimate as a comment on the pull request.
+      # Step 5: Print a readable cost summary to the workflow logs.
+      - name: Print Infracost summary in logs
+        run: |
+          echo "Infracost diff summary"
+          infracost output --path=/tmp/infracost.json --format=table
+
+      # Step 6: Post the cost estimate as a comment on the pull request.
       - name: Post Infracost comment
+        if: ${{ github.event.pull_request.head.repo.fork == false && env.INFRACOST_API_KEY != '' }}
         run: |
           infracost comment github --path=/tmp/infracost.json \
-                                   --repo=$GITHUB_REPOSITORY \
-                                   --github-token=${{ github.token }} \
-                                   --pull-request=${{ github.event.pull_request.number }} \
-                                   --behavior=update
+                             --repo=$GITHUB_REPOSITORY \
+                             --github-token=${{ github.token }} \
+                             --pull-request=${{ github.event.pull_request.number }} \
+                             --behavior=update
