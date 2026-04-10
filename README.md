@@ -135,7 +135,7 @@ The `environments/dev` stack provisions real AWS resources using the `modules/ne
   - Node SG: ingress TCP 0–65535 (ephemeral ports for workload response traffic)
 - **IAM role — EKS cluster**: trusted by `eks.amazonaws.com`, attached `AmazonEKSClusterPolicy`
 - **IAM role — EKS nodes**: trusted by `ec2.amazonaws.com`, attached `AmazonEKSWorkerNodePolicy`, `AmazonEC2ContainerRegistryReadOnly`, `AmazonEKS_CNI_Policy`
-- **ECR repositories**: environment-scoped image registries (currently `app` and `worker`) with mutable tags
+- **ECR repositories**: environment-scoped image registries (currently `app` and `worker`) with immutable tags, scan-on-push enabled, and KMS encryption
 
 ## 🔐 Configuration
 

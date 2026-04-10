@@ -85,18 +85,6 @@ variable "ecr_repository_names" {
   default     = ["app"]
 }
 
-variable "ecr_image_tag_mutability" {
-  description = "ECR image tag mutability setting: MUTABLE or IMMUTABLE"
-  type        = string
-  default     = "MUTABLE"
-}
-
-variable "ecr_scan_on_push" {
-  description = "Whether to enable ECR vulnerability scanning on image push"
-  type        = bool
-  default     = false
-}
-
 variable "ecr_force_delete" {
   description = "Allow Terraform to delete ECR repositories that still contain images (convenient for dev, keep false for production)"
   type        = bool
