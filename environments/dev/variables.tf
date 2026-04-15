@@ -111,6 +111,11 @@ variable "eks_node_capacity_type" {
   description = "Node capacity type: ON_DEMAND or SPOT"
   type        = string
   default     = "ON_DEMAND"
+
+  validation {
+    condition     = contains(["ON_DEMAND", "SPOT"], var.eks_node_capacity_type)
+    error_message = "eks_node_capacity_type must be either ON_DEMAND or SPOT."
+  }
 }
 
 variable "eks_node_desired_size" {
