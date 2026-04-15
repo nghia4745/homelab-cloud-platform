@@ -105,18 +105,33 @@ variable "node_desired_size" {
   description = "Desired number of worker nodes"
   type        = number
   default     = 2
+
+  validation {
+    condition     = var.node_desired_size >= var.node_min_size && var.node_desired_size <= var.node_max_size
+    error_message = "node_desired_size must be greater than or equal to node_min_size and less than or equal to node_max_size."
+  }
 }
 
 variable "node_min_size" {
   description = "Minimum number of worker nodes"
   type        = number
   default     = 1
+
+  validation {
+    condition     = var.node_min_size >= 0 && var.node_min_size <= var.node_desired_size && var.node_min_size <= var.node_max_size
+    error_message = "node_min_size must be non-negative and less than or equal to both node_desired_size and node_max_size."
+  }
 }
 
 variable "node_max_size" {
   description = "Maximum number of worker nodes"
   type        = number
   default     = 3
+
+  validation {
+    condition     = var.node_max_size >= 0 && var.node_max_size >= var.node_desired_size && var.node_max_size >= var.node_min_size
+    error_message = "node_max_size must be non-negative and greater than or equal to both node_desired_size and node_min_size."
+  }
 }
 
 # Shared tags applied to both the control plane and node group resources.
