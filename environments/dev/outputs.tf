@@ -46,3 +46,24 @@ output "ecr_repository_arns" {
   description = "ECR repository ARNs from ECR module"
   value       = module.ecr.repository_arns
 }
+
+output "eks_cluster_id" {
+  description = "EKS cluster ID from EKS module"
+  value       = module.eks.cluster_id
+}
+
+output "eks_cluster_endpoint" {
+  description = "EKS cluster API endpoint for kubectl"
+  value       = module.eks.cluster_endpoint
+}
+
+output "eks_cluster_certificate_authority_data" {
+  description = "Base64-encoded CA certificate for kubectl"
+  value       = module.eks.cluster_certificate_authority_data
+  sensitive   = true
+}
+
+output "eks_node_group_status" {
+  description = "Status of the EKS node group (CREATING, ACTIVE, DELETING, FAILED, UPDATING, PENDING)"
+  value       = module.eks.node_group_status
+}

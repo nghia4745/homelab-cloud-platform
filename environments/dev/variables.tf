@@ -90,3 +90,43 @@ variable "ecr_force_delete" {
   type        = bool
   default     = true
 }
+
+# EKS module inputs (cluster and node group settings, plus networking inputs passed through from modules/networking)
+# These tune Kubernetes version and worker node sizing without exposing the
+# lower-level networking and IAM dependencies directly to the caller.
+
+variable "eks_cluster_version" {
+  description = "Kubernetes version for EKS cluster"
+  type        = string
+  default     = "1.32"
+}
+
+variable "eks_node_instance_types" {
+  description = "EC2 instance types for EKS worker nodes"
+  type        = list(string)
+  default     = ["t3.medium"]
+}
+
+variable "eks_node_capacity_type" {
+  description = "Node capacity type: ON_DEMAND or SPOT"
+  type        = string
+  default     = "ON_DEMAND"
+}
+
+variable "eks_node_desired_size" {
+  description = "Desired number of EKS worker nodes"
+  type        = number
+  default     = 2
+}
+
+variable "eks_node_min_size" {
+  description = "Minimum number of EKS worker nodes"
+  type        = number
+  default     = 1
+}
+
+variable "eks_node_max_size" {
+  description = "Maximum number of EKS worker nodes"
+  type        = number
+  default     = 3
+}

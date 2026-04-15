@@ -49,8 +49,34 @@ module "ecr" {
   project_name = var.project_name
   environment  = var.environment
 
-  repository_names     = var.ecr_repository_names
-  force_delete         = var.ecr_force_delete
+  repository_names = var.ecr_repository_names
+  force_delete     = var.ecr_force_delete
+
+  tags = var.tags
+}
+
+# ── EKS ───────────────────────────────────────────────────────────────────────
+# Creates the EKS control plane and managed node group.
+# Depends on networking (private subnets, cluster SG) and IAM (cluster/node roles).
+# This is the first module here that composes outputs from multiple other modules.
+module "eks" {
+  source = "../../modules/eks"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  cluster_version  = var.eks_cluster_version
+  cluster_role_arn = module.iam.eks_cluster_role_arn
+
+  private_subnet_ids        = module.networking.private_subnet_ids
+  cluster_security_group_id = module.networking.cluster_security_group_id
+
+  node_role_arn       = module.iam.eks_node_role_arn
+  node_instance_types = var.eks_node_instance_types
+  node_capacity_type  = var.eks_node_capacity_type
+  node_desired_size   = var.eks_node_desired_size
+  node_min_size       = var.eks_node_min_size
+  node_max_size       = var.eks_node_max_size
 
   tags = var.tags
 }

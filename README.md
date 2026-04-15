@@ -25,14 +25,14 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │       ├── providers.tf           # AWS provider + version constraints
 │       ├── backend.tf             # Remote state (S3 + DynamoDB locking)
 │       ├── variables.tf           # Environment-level variable declarations
-│       ├── main.tf                # Module wiring — networking, IAM, and ECR
+│       ├── main.tf                # Module wiring — networking, IAM, ECR, and EKS
 │       ├── outputs.tf             # Re-exports module outputs after apply
 │       └── dev.auto.tfvars        # Concrete values (auto-loaded by Terraform)
 ├── modules/
 │   ├── networking/                # VPC, subnets, IGW, NAT, route tables, SGs
 │   ├── iam/                       # EKS cluster and node IAM roles + policy attachments
 │   ├── ecr/                       # Container image repositories for workloads
-│   └── eks/                       # (planned) EKS cluster and node groups
+│   └── eks/                       # EKS control plane and managed node group
 ├── policies/                      # Custom Checkov security policies
 │   └── tagging_policy.yml         # Enforces Owner tag on S3 buckets
 ├── .github/workflows/             # GitHub Actions CI/CD workflows
@@ -123,7 +123,7 @@ terraform -chdir=environments/dev destroy
 
 ### AWS Resources (Dev Environment)
 
-The `environments/dev` stack provisions real AWS resources using the `modules/networking`, `modules/iam`, and `modules/ecr` modules.
+The `environments/dev` stack provisions real AWS resources using the `modules/networking`, `modules/iam`, `modules/ecr`, and `modules/eks` modules.
 
 - **VPC**: `10.0.0.0/16` with DNS hostname support enabled
 - **Public subnets**: one per AZ across `us-east-1a` and `us-east-1b` (for load balancers and internet-facing traffic)
@@ -136,6 +136,8 @@ The `environments/dev` stack provisions real AWS resources using the `modules/ne
 - **IAM role — EKS cluster**: trusted by `eks.amazonaws.com`, attached `AmazonEKSClusterPolicy`
 - **IAM role — EKS nodes**: trusted by `ec2.amazonaws.com`, attached `AmazonEKSWorkerNodePolicy`, `AmazonEC2ContainerRegistryReadOnly`, `AmazonEKS_CNI_Policy`
 - **ECR repositories**: environment-scoped image registries (currently `app` and `worker`) with immutable tags, scan-on-push enabled, and KMS encryption
+- **EKS cluster**: one control plane running Kubernetes `1.32` with public and private API endpoint access enabled
+- **EKS managed node group**: worker nodes in private subnets using `t3.medium` instances with min/desired/max scaling of `1/2/3`
 
 ## 🔐 Configuration
 
@@ -148,7 +150,7 @@ db_password = "your-secure-password-here"
 > ⚠️ **Security Note**: `secret.auto.tfvars` is auto-loaded and should be git-ignored. Keep sensitive values out of version control.
 
 For AWS dev stack values, edit `environments/dev/dev.auto.tfvars`.
-This controls networking, IAM wiring context, and ECR behavior (repository names).
+This controls networking, IAM wiring context, ECR repository names, and EKS cluster/node-group sizing.
 
 ## 🛡️ Security & CI/CD
 
@@ -266,6 +268,31 @@ Module structure reminders:
 
 Implementation choices made during the exercise:
 - Repository outputs are exposed as maps rather than lists to avoid order-coupling and simplify module consumers.
+
+## ☸️ EKS Module Notes
+
+The `modules/eks` module provisions the Kubernetes control plane and a managed worker node group on top of the networking and IAM modules.
+
+What it creates:
+- One EKS cluster control plane.
+- One EKS managed node group.
+- API endpoint access configuration for public/private connectivity.
+
+What to remember about the design:
+- The EKS module does not create its own VPC or IAM roles. It consumes private subnet IDs, security group IDs, and IAM role ARNs from other modules.
+- `aws_eks_cluster` and `aws_eks_node_group` are separate resources with different lifecycles. The control plane can stay stable while nodes scale or roll.
+- Managed node groups let AWS handle EC2 instance lifecycle tasks like joining nodes to the cluster and replacing unhealthy instances.
+- The module uses private subnets for nodes so worker instances are not directly internet-facing.
+
+Module structure reminders:
+- `variables.tf` defines cluster settings, endpoint access rules, node group sizing, and dependency inputs from networking/IAM.
+- `main.tf` creates the cluster and managed node group, with locals used for consistent names and tags.
+- `outputs.tf` exposes cluster connection details such as endpoint, certificate authority data, and node group status.
+
+Implementation choices made during the exercise:
+- Cluster and node group names default to the `project-environment` pattern but can be overridden if needed.
+- The module uses managed node groups instead of self-managed autoscaling groups to keep the learning path focused on core EKS concepts.
+- `max_unavailable = 1` keeps rolling node updates conservative so only one worker is drained at a time.
 
 ## 🧹 Useful Commands
 
