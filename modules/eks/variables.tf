@@ -51,7 +51,7 @@ variable "endpoint_private_access" {
 variable "endpoint_public_access" {
   description = "Whether the EKS API endpoint is publicly accessible"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "public_access_cidrs" {
