@@ -104,13 +104,13 @@ variable "eks_cluster_version" {
 variable "eks_node_instance_types" {
   description = "EC2 instance types for EKS worker nodes"
   type        = list(string)
-  default     = ["t3.medium"]
+  default     = ["t3.small"]
 }
 
 variable "eks_node_capacity_type" {
   description = "Node capacity type: ON_DEMAND or SPOT"
   type        = string
-  default     = "ON_DEMAND"
+  default     = "SPOT"
 
   validation {
     condition     = contains(["ON_DEMAND", "SPOT"], var.eks_node_capacity_type)
@@ -121,17 +121,17 @@ variable "eks_node_capacity_type" {
 variable "eks_node_desired_size" {
   description = "Desired number of EKS worker nodes"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "eks_node_min_size" {
   description = "Minimum number of EKS worker nodes"
   type        = number
-  default     = 1
+  default     = 0
 }
 
 variable "eks_node_max_size" {
   description = "Maximum number of EKS worker nodes"
   type        = number
-  default     = 3
+  default     = 1
 }
