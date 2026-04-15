@@ -39,6 +39,23 @@ resource "aws_eks_cluster" "this" {
   })
 }
 
+resource "aws_launch_template" "node_group" {
+  name_prefix            = "${local.node_group_name}-"
+  update_default_version = true
+  vpc_security_group_ids = [var.node_security_group_id]
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+
+    ebs {
+      volume_size           = var.node_disk_size
+      volume_type           = "gp3"
+      delete_on_termination = true
+      encrypted             = true
+    }
+  }
+}
+
 # Managed node group: AWS-managed EC2 instances that register as Kubernetes worker nodes.
 # The node group depends on the cluster existing first; the implicit reference to the
 # aws_eks_cluster.this.name creates that dependency automatically.
@@ -50,7 +67,6 @@ resource "aws_eks_node_group" "this" {
 
   instance_types = var.node_instance_types
   capacity_type  = var.node_capacity_type
-  disk_size      = var.node_disk_size
 
   # scaling_config controls how many nodes exist at any point in time.
   scaling_config {
@@ -62,6 +78,11 @@ resource "aws_eks_node_group" "this" {
   # update_config controls how many nodes can be unavailable during a rolling update.
   update_config {
     max_unavailable = 1
+  }
+
+  launch_template {
+    id      = aws_launch_template.node_group.id
+    version = aws_launch_template.node_group.latest_version
   }
 
   tags = merge(local.common_tags, {

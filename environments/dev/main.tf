@@ -70,6 +70,7 @@ module "eks" {
 
   private_subnet_ids        = module.networking.private_subnet_ids
   cluster_security_group_id = module.networking.cluster_security_group_id
+  node_security_group_id    = module.networking.node_security_group_id
 
   node_role_arn       = module.iam.eks_node_role_arn
   node_instance_types = var.eks_node_instance_types

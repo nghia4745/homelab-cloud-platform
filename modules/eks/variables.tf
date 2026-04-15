@@ -41,6 +41,11 @@ variable "cluster_security_group_id" {
   type        = string
 }
 
+variable "node_security_group_id" {
+  description = "Security group ID attached to EKS worker nodes via launch template"
+  type        = string
+}
+
 # API endpoint access controls
 variable "endpoint_private_access" {
   description = "Whether the EKS API endpoint is accessible from within the VPC"
