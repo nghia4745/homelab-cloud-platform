@@ -57,7 +57,12 @@ variable "endpoint_public_access" {
 variable "public_access_cidrs" {
   description = "CIDR blocks allowed to reach the public EKS API endpoint"
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = []
+
+  validation {
+    condition     = !var.endpoint_public_access || length(var.public_access_cidrs) > 0
+    error_message = "public_access_cidrs must contain at least one explicit CIDR when endpoint_public_access is true."
+  }
 }
 
 # Managed node group settings
