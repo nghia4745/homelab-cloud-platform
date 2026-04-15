@@ -135,8 +135,8 @@ variable "node_min_size" {
   default     = 1
 
   validation {
-    condition     = var.node_min_size >= 0 && var.node_min_size <= var.node_desired_size && var.node_min_size <= var.node_max_size
-    error_message = "node_min_size must be non-negative and less than or equal to both node_desired_size and node_max_size."
+    condition     = var.node_min_size >= 0
+    error_message = "node_min_size must be non-negative."
   }
 }
 
@@ -146,8 +146,8 @@ variable "node_max_size" {
   default     = 3
 
   validation {
-    condition     = var.node_max_size >= 0 && var.node_max_size >= var.node_desired_size && var.node_max_size >= var.node_min_size
-    error_message = "node_max_size must be non-negative and greater than or equal to both node_desired_size and node_min_size."
+    condition     = var.node_max_size >= 0
+    error_message = "node_max_size must be non-negative."
   }
 }
 

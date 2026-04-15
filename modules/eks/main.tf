@@ -19,71 +19,11 @@ locals {
 
 data "aws_caller_identity" "current" {}
 
-data "aws_iam_policy_document" "cluster_encryption_kms" {
-  statement {
-    sid    = "AllowAccountAdministration"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
-    }
-
-    actions   = ["kms:*"]
-    resources = ["*"]
-  }
-
-  statement {
-    sid    = "AllowEKSClusterRoleUseOfKey"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = [var.cluster_role_arn]
-    }
-
-    actions = [
-      "kms:Encrypt",
-      "kms:Decrypt",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:DescribeKey"
-    ]
-
-    resources = ["*"]
-  }
-
-  statement {
-    sid    = "AllowEKSClusterRoleGrantManagement"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = [var.cluster_role_arn]
-    }
-
-    actions = [
-      "kms:CreateGrant",
-      "kms:ListGrants",
-      "kms:RevokeGrant"
-    ]
-
-    resources = ["*"]
-
-    condition {
-      test     = "Bool"
-      variable = "kms:GrantIsForAWSResource"
-      values   = ["true"]
-    }
-  }
-}
-
 # KMS key used by the EKS control plane to encrypt Kubernetes Secrets at rest.
 resource "aws_kms_key" "cluster_encryption" {
   description             = "KMS key for EKS secrets encryption: ${local.cluster_name}"
   enable_key_rotation     = true
   deletion_window_in_days = 7
-  policy                  = data.aws_iam_policy_document.cluster_encryption_kms.json
 
   tags = merge(local.common_tags, {
     Name = "${local.cluster_name}-secrets-kms"
@@ -93,6 +33,75 @@ resource "aws_kms_key" "cluster_encryption" {
 resource "aws_kms_alias" "cluster_encryption" {
   name          = "alias/${local.cluster_name}-secrets"
   target_key_id = aws_kms_key.cluster_encryption.key_id
+}
+
+resource "aws_kms_key_policy" "cluster_encryption" {
+  key_id = aws_kms_key.cluster_encryption.key_id
+
+  # Keep key access constrained to this specific key ARN while allowing
+  # the EKS cluster role to encrypt Kubernetes Secrets.
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowAccountAdministration"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = [
+          "kms:Create*",
+          "kms:Describe*",
+          "kms:Enable*",
+          "kms:List*",
+          "kms:Put*",
+          "kms:Update*",
+          "kms:Revoke*",
+          "kms:Disable*",
+          "kms:Get*",
+          "kms:Delete*",
+          "kms:TagResource",
+          "kms:UntagResource",
+          "kms:ScheduleKeyDeletion",
+          "kms:CancelKeyDeletion"
+        ]
+        Resource = aws_kms_key.cluster_encryption.arn
+      },
+      {
+        Sid    = "AllowEKSClusterRoleUseOfKey"
+        Effect = "Allow"
+        Principal = {
+          AWS = var.cluster_role_arn
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = aws_kms_key.cluster_encryption.arn
+      },
+      {
+        Sid    = "AllowEKSClusterRoleGrantManagement"
+        Effect = "Allow"
+        Principal = {
+          AWS = var.cluster_role_arn
+        }
+        Action = [
+          "kms:CreateGrant",
+          "kms:ListGrants",
+          "kms:RevokeGrant"
+        ]
+        Resource = aws_kms_key.cluster_encryption.arn
+        Condition = {
+          Bool = {
+            "kms:GrantIsForAWSResource" = "true"
+          }
+        }
+      }
+    ]
+  })
 }
 
 # The EKS cluster is the Kubernetes control plane managed by AWS.
