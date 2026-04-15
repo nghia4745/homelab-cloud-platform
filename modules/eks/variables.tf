@@ -70,6 +70,18 @@ variable "public_access_cidrs" {
   }
 }
 
+variable "enabled_cluster_log_types" {
+  description = "EKS control plane log types to enable"
+  type        = list(string)
+  default = [
+    "api",
+    "audit",
+    "authenticator",
+    "controllerManager",
+    "scheduler"
+  ]
+}
+
 # Managed node group settings
 # These control the compute capacity that actually runs Pods in the cluster.
 variable "node_group_name" {

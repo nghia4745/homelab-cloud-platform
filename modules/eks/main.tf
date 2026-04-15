@@ -17,6 +17,84 @@ locals {
   })
 }
 
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "cluster_encryption_kms" {
+  statement {
+    sid    = "AllowAccountAdministration"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowEKSClusterRoleUseOfKey"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.cluster_role_arn]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey"
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowEKSClusterRoleGrantManagement"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.cluster_role_arn]
+    }
+
+    actions = [
+      "kms:CreateGrant",
+      "kms:ListGrants",
+      "kms:RevokeGrant"
+    ]
+
+    resources = ["*"]
+
+    condition {
+      test     = "Bool"
+      variable = "kms:GrantIsForAWSResource"
+      values   = ["true"]
+    }
+  }
+}
+
+# KMS key used by the EKS control plane to encrypt Kubernetes Secrets at rest.
+resource "aws_kms_key" "cluster_encryption" {
+  description             = "KMS key for EKS secrets encryption: ${local.cluster_name}"
+  enable_key_rotation     = true
+  deletion_window_in_days = 7
+  policy                  = data.aws_iam_policy_document.cluster_encryption_kms.json
+
+  tags = merge(local.common_tags, {
+    Name = "${local.cluster_name}-secrets-kms"
+  })
+}
+
+resource "aws_kms_alias" "cluster_encryption" {
+  name          = "alias/${local.cluster_name}-secrets"
+  target_key_id = aws_kms_key.cluster_encryption.key_id
+}
+
 # The EKS cluster is the Kubernetes control plane managed by AWS.
 # You do not see or manage the control plane EC2 instances - AWS handles that.
 # You only configure networking, IAM, and access settings.
@@ -24,6 +102,8 @@ resource "aws_eks_cluster" "this" {
   name     = local.cluster_name
   version  = var.cluster_version
   role_arn = var.cluster_role_arn
+
+  enabled_cluster_log_types = var.enabled_cluster_log_types
 
   # vpc_config tells EKS which subnets and security groups to attach the control plane to.
   vpc_config {
@@ -34,26 +114,16 @@ resource "aws_eks_cluster" "this" {
     public_access_cidrs     = var.public_access_cidrs
   }
 
+  encryption_config {
+    resources = ["secrets"]
+    provider {
+      key_arn = aws_kms_key.cluster_encryption.arn
+    }
+  }
+
   tags = merge(local.common_tags, {
     Name = local.cluster_name
   })
-}
-
-resource "aws_launch_template" "node_group" {
-  name_prefix            = "${local.node_group_name}-"
-  update_default_version = true
-  vpc_security_group_ids = [var.node_security_group_id]
-
-  block_device_mappings {
-    device_name = "/dev/xvda"
-
-    ebs {
-      volume_size           = var.node_disk_size
-      volume_type           = "gp3"
-      delete_on_termination = true
-      encrypted             = true
-    }
-  }
 }
 
 # Managed node group: AWS-managed EC2 instances that register as Kubernetes worker nodes.
@@ -67,6 +137,7 @@ resource "aws_eks_node_group" "this" {
 
   instance_types = var.node_instance_types
   capacity_type  = var.node_capacity_type
+  disk_size      = var.node_disk_size
 
   # scaling_config controls how many nodes exist at any point in time.
   scaling_config {
@@ -78,11 +149,6 @@ resource "aws_eks_node_group" "this" {
   # update_config controls how many nodes can be unavailable during a rolling update.
   update_config {
     max_unavailable = 1
-  }
-
-  launch_template {
-    id      = aws_launch_template.node_group.id
-    version = aws_launch_template.node_group.latest_version
   }
 
   tags = merge(local.common_tags, {
