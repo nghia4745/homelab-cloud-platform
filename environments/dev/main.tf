@@ -81,7 +81,7 @@ module "eks" {
 
   endpoint_private_access = var.eks_endpoint_private_access
   endpoint_public_access  = var.eks_endpoint_public_access
-  public_access_cidrs = var.eks_public_access_cidrs
+  public_access_cidrs     = var.eks_public_access_cidrs
 
   tags = var.tags
 }

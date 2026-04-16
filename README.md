@@ -18,6 +18,7 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 ```
 .
 ├── environments/
+│   ├── bootstrap/                 # Stack 0: backend infrastructure (S3 + DynamoDB)
 │   ├── local/
 │   │   ├── vault/                 # Stack A: local Vault runtime (Docker)
 │   │   └── app/                   # Stack B: Vault secrets + nginx app
@@ -32,13 +33,14 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │   ├── networking/                # VPC, subnets, IGW, NAT, route tables, SGs
 │   ├── iam/                       # EKS cluster and node IAM roles + policy attachments
 │   ├── ecr/                       # Container image repositories for workloads
-│   └── eks/                       # EKS control plane and managed node group
+│   ├── eks/                       # EKS control plane and managed node group
+│   └── s3/                        # Terraform state backend bucket and lock table
 ├── policies/                      # Custom Checkov security policies
 │   └── tagging_policy.yml         # Enforces Owner tag on S3 buckets
 ├── .github/workflows/             # GitHub Actions CI/CD workflows
 │   ├── security-scan.yml          # Runs Checkov security scans
 │   ├── infracost.yml              # Estimates infrastructure costs on PRs
-│   └── drift-detection.yml        # Hourly drift detection via Terraform plan
+│   ├── drift-detection.yml        # Hourly drift detection via Terraform plan
 ├── Makefile                       # Convenience targets for local stacks
 └── README.md                      # This file
 ```
@@ -89,6 +91,37 @@ curl http://localhost:8080
 ```bash
 terraform -chdir=environments/local/app destroy
 terraform -chdir=environments/local/vault destroy
+```
+
+### Bootstrap backend environment (run once first)
+
+Create the remote backend infrastructure used by stacks that use the S3 backend:
+```bash
+terraform -chdir=environments/bootstrap init
+terraform -chdir=environments/bootstrap plan
+terraform -chdir=environments/bootstrap apply
+```
+
+This stack creates:
+- S3 bucket for remote Terraform state files
+- DynamoDB table for state locking
+
+After apply, wire these output values into each environment `backend.tf`:
+```bash
+terraform -chdir=environments/bootstrap output state_bucket_name
+terraform -chdir=environments/bootstrap output dynamodb_table_name
+```
+
+Update backend blocks (for example `environments/dev/backend.tf`) so `bucket` and
+`dynamodb_table` match the bootstrap outputs.
+```hcl
+backend "s3" {
+  bucket         = "<state_bucket_name output>"
+  key            = "dev/homelab.tfstate"
+  dynamodb_table = "<dynamodb_table_name output>"
+  region         = "us-east-1"
+  encrypt        = true
+}
 ```
 
 ### Dev environment (real AWS)
