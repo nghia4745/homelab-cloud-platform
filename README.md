@@ -93,6 +93,28 @@ terraform -chdir=environments/local/app destroy
 terraform -chdir=environments/local/vault destroy
 ```
 
+### Bootstrap backend environment (run once first)
+
+Create the remote backend infrastructure used by stacks that use the S3 backend:
+```bash
+terraform -chdir=environments/bootstrap init
+terraform -chdir=environments/bootstrap plan
+terraform -chdir=environments/bootstrap apply
+```
+
+This stack creates:
+- S3 bucket for remote Terraform state files
+- DynamoDB table for state locking
+
+After apply, wire these output values into each environment `backend.tf`:
+```bash
+terraform -chdir=environments/bootstrap output state_bucket_name
+terraform -chdir=environments/bootstrap output dynamodb_table_name
+```
+
+Update backend blocks (for example `environments/dev/backend.tf`) so `bucket` and
+`dynamodb_table` match the bootstrap outputs.
+
 ### Dev environment (real AWS)
 
 Ensure AWS credentials are configured, then:
@@ -108,19 +130,6 @@ To clean up:
 ```bash
 terraform -chdir=environments/dev destroy
 ```
-
-### Bootstrap backend environment (run once first)
-
-Create the remote backend infrastructure used by other stacks:
-```bash
-terraform -chdir=environments/bootstrap init
-terraform -chdir=environments/bootstrap plan
-terraform -chdir=environments/bootstrap apply
-```
-
-This stack creates:
-- S3 bucket for remote Terraform state files
-- DynamoDB table for state locking
 
 ## 📦 What This Project Creates
 
