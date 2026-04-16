@@ -1,0 +1,56 @@
+name: Terraform Docs
+
+on:
+  pull_request:
+    paths:
+      - "modules/**"
+      - "README.md"
+      - "scripts/generate-terraform-docs.sh"
+      - "Makefile"
+  push:
+    branches:
+      - dev
+    paths:
+      - "modules/**"
+      - "README.md"
+      - "scripts/generate-terraform-docs.sh"
+      - "Makefile"
+
+jobs:
+  docs-check:
+    name: Generate and verify terraform-docs
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install terraform-docs
+        run: |
+          if command -v terraform-docs >/dev/null 2>&1; then
+            terraform-docs --version
+            exit 0
+          fi
+
+          VERSION="v0.20.0"
+          OS="darwin"
+          ARCH="arm64"
+
+          if [ "$(uname -s)" = "Linux" ]; then
+            OS="linux"
+          fi
+
+          if [ "$(uname -m)" = "x86_64" ]; then
+            ARCH="amd64"
+          fi
+
+          mkdir -p "$HOME/.local/bin"
+          curl -sSL "https://github.com/terraform-docs/terraform-docs/releases/download/${VERSION}/terraform-docs-${VERSION}-${OS}-${ARCH}.tar.gz" -o /tmp/terraform-docs.tar.gz
+          tar -xzf /tmp/terraform-docs.tar.gz -C /tmp
+          chmod +x /tmp/terraform-docs
+          mv /tmp/terraform-docs "$HOME/.local/bin/terraform-docs"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          terraform-docs --version
+      
+      - name: Verify generated docs
+        run: make docs-check

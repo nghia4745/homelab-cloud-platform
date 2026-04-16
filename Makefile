@@ -2,8 +2,9 @@ SHELL := /bin/sh
 
 VAULT_DIR := environments/local/vault
 APP_DIR := environments/local/app
+BOOTSTRAP_DIR := environments/bootstrap
 
-.PHONY: up down plan init
+.PHONY: up down plan init bootstrap-init bootstrap-plan bootstrap-apply bootstrap-destroy docs docs-check
 
 init:
 	terraform -chdir=$(VAULT_DIR) init
@@ -20,3 +21,22 @@ up:
 down:
 	terraform -chdir=$(APP_DIR) destroy
 	terraform -chdir=$(VAULT_DIR) destroy
+
+bootstrap-init:
+	terraform -chdir=$(BOOTSTRAP_DIR) init
+
+bootstrap-plan:
+	terraform -chdir=$(BOOTSTRAP_DIR) plan
+
+bootstrap-apply:
+	terraform -chdir=$(BOOTSTRAP_DIR) apply
+
+bootstrap-destroy:
+	terraform -chdir=$(BOOTSTRAP_DIR) destroy
+
+docs:
+	./scripts/generate-terraform-docs.sh
+
+docs-check:
+	./scripts/generate-terraform-docs.sh
+	git diff --exit-code README.md

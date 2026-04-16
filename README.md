@@ -18,6 +18,7 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 ```
 .
 ├── environments/
+│   ├── bootstrap/                 # Stack 0: backend infrastructure (S3 + DynamoDB)
 │   ├── local/
 │   │   ├── vault/                 # Stack A: local Vault runtime (Docker)
 │   │   └── app/                   # Stack B: Vault secrets + nginx app
@@ -32,14 +33,18 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │   ├── networking/                # VPC, subnets, IGW, NAT, route tables, SGs
 │   ├── iam/                       # EKS cluster and node IAM roles + policy attachments
 │   ├── ecr/                       # Container image repositories for workloads
-│   └── eks/                       # EKS control plane and managed node group
+│   ├── eks/                       # EKS control plane and managed node group
+│   └── s3/                        # Terraform state backend bucket and lock table
 ├── policies/                      # Custom Checkov security policies
 │   └── tagging_policy.yml         # Enforces Owner tag on S3 buckets
 ├── .github/workflows/             # GitHub Actions CI/CD workflows
 │   ├── security-scan.yml          # Runs Checkov security scans
 │   ├── infracost.yml              # Estimates infrastructure costs on PRs
-│   └── drift-detection.yml        # Hourly drift detection via Terraform plan
+│   ├── drift-detection.yml        # Hourly drift detection via Terraform plan
+│   └── terraform-docs.yml         # Verifies generated module docs are up to date
 ├── Makefile                       # Convenience targets for local stacks
+├── scripts/
+│   └── generate-terraform-docs.sh # Generates module docs in README via terraform-docs
 └── README.md                      # This file
 ```
 
@@ -107,6 +112,19 @@ To clean up:
 terraform -chdir=environments/dev destroy
 ```
 
+### Bootstrap backend environment (run once first)
+
+Create the remote backend infrastructure used by other stacks:
+```bash
+terraform -chdir=environments/bootstrap init
+terraform -chdir=environments/bootstrap plan
+terraform -chdir=environments/bootstrap apply
+```
+
+This stack creates:
+- S3 bucket for remote Terraform state files
+- DynamoDB table for state locking
+
 ## 📦 What This Project Creates
 
 ### Docker Resources
@@ -170,6 +188,23 @@ checkov -d . --external-checks-dir policies --framework terraform
 # Cost estimate
 infracost breakdown --path=.
 ```
+
+## 📚 Terraform Docs Automation
+
+Module documentation in this README is generated with `terraform-docs`.
+
+Generate docs locally:
+```bash
+make docs
+```
+
+Check docs are up to date (useful in CI):
+```bash
+make docs-check
+```
+
+<!-- BEGIN_TF_DOCS -->
+<!-- END_TF_DOCS -->
 
 ## 📝 Key Terraform Concepts Demonstrated
 
