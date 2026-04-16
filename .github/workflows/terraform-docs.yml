@@ -62,4 +62,7 @@ jobs:
           terraform-docs --version
       
       - name: Verify generated docs
-        run: make docs-check
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export TERRAFORM_DOCS_BIN="$HOME/.local/bin/terraform-docs"
+          make docs-check

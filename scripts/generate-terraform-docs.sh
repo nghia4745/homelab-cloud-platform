@@ -5,6 +5,20 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 README_FILE="$ROOT_DIR/README.md"
 TMP_FILE="$(mktemp)"
 
+TERRAFORM_DOCS_BIN="${TERRAFORM_DOCS_BIN:-}"
+if [[ -z "$TERRAFORM_DOCS_BIN" ]]; then
+  if command -v terraform-docs >/dev/null 2>&1; then
+    TERRAFORM_DOCS_BIN="$(command -v terraform-docs)"
+  elif [[ -x "$HOME/.local/bin/terraform-docs" ]]; then
+    TERRAFORM_DOCS_BIN="$HOME/.local/bin/terraform-docs"
+  fi
+fi
+
+if [[ -z "$TERRAFORM_DOCS_BIN" || ! -x "$TERRAFORM_DOCS_BIN" ]]; then
+  echo "terraform-docs not found. Install it or set TERRAFORM_DOCS_BIN to the executable path." >&2
+  exit 127
+fi
+
 modules=(networking iam ecr eks s3)
 
 {
@@ -13,7 +27,7 @@ modules=(networking iam ecr eks s3)
   for module in "${modules[@]}"; do
     echo "### modules/${module}"
     echo
-    terraform-docs markdown table "$ROOT_DIR/modules/${module}"
+    "$TERRAFORM_DOCS_BIN" markdown table "$ROOT_DIR/modules/${module}"
     echo
   done
   echo "<!-- END_TF_DOCS -->"
