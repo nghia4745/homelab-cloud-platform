@@ -90,3 +90,66 @@ variable "ecr_force_delete" {
   type        = bool
   default     = true
 }
+
+# EKS module inputs (cluster and node group settings, plus networking inputs passed through from modules/networking)
+# These tune Kubernetes version and worker node sizing without exposing the
+# lower-level networking and IAM dependencies directly to the caller.
+
+variable "eks_cluster_version" {
+  description = "Kubernetes version for EKS cluster"
+  type        = string
+  default     = "1.32"
+}
+
+variable "eks_node_instance_types" {
+  description = "EC2 instance types for EKS worker nodes"
+  type        = list(string)
+  default     = ["t3.small"]
+}
+
+variable "eks_node_capacity_type" {
+  description = "Node capacity type: ON_DEMAND or SPOT"
+  type        = string
+  default     = "ON_DEMAND"
+
+  validation {
+    condition     = contains(["ON_DEMAND", "SPOT"], var.eks_node_capacity_type)
+    error_message = "eks_node_capacity_type must be either ON_DEMAND or SPOT."
+  }
+}
+
+variable "eks_node_desired_size" {
+  description = "Desired number of EKS worker nodes"
+  type        = number
+  default     = 1
+}
+
+variable "eks_node_min_size" {
+  description = "Minimum number of EKS worker nodes"
+  type        = number
+  default     = 0
+}
+
+variable "eks_node_max_size" {
+  description = "Maximum number of EKS worker nodes"
+  type        = number
+  default     = 1
+}
+
+variable "eks_endpoint_private_access" {
+  description = "Whether EKS API endpoint is accessible only within the VPC"
+  type        = bool
+  default     = true
+}
+
+variable "eks_endpoint_public_access" {
+  description = "Whether EKS API endpoint is accessible from the public internet"
+  type        = bool
+  default     = false
+}
+
+variable "eks_public_access_cidrs" {
+  description = "CIDRs allowed to access EKS API endpoint when public access is enabled"
+  type        = list(string)
+  default     = []
+}
