@@ -79,5 +79,9 @@ module "eks" {
   node_min_size       = var.eks_node_min_size
   node_max_size       = var.eks_node_max_size
 
+  endpoint_private_access = var.eks_endpoint_private_access
+  endpoint_public_access  = var.eks_endpoint_public_access
+  public_access_cidrs = var.eks_public_access_cidrs
+
   tags = var.tags
 }

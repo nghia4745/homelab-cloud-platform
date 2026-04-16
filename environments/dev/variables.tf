@@ -135,3 +135,21 @@ variable "eks_node_max_size" {
   type        = number
   default     = 1
 }
+
+variable "eks_endpoint_private_access" {
+  description = "Whether EKS API endpoint is accessible only within the VPC"
+  type        = bool
+  default     = true
+}
+
+variable "eks_endpoint_public_access" {
+  description = "Whether EKS API endpoint is accessible from the public internet"
+  type        = bool
+  default     = false
+}
+
+variable "eks_public_access_cidrs" {
+  description = "CIDRs allowed to access EKS API endpoint when public access is enabled"
+  type        = list(string)
+  default     = []
+}
