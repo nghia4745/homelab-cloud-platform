@@ -29,7 +29,7 @@ variable "dynamodb_kms_key_arn" {
 }
 
 variable "force_destroy" {
-  description = "Allow bucket/table destruction during Terraform destroy (useful for learning env)"
+  description = "Allow S3 bucket destruction during Terraform destroy (useful for learning env)"
   type        = bool
   default     = false
 }
