@@ -114,6 +114,15 @@ terraform -chdir=environments/bootstrap output dynamodb_table_name
 
 Update backend blocks (for example `environments/dev/backend.tf`) so `bucket` and
 `dynamodb_table` match the bootstrap outputs.
+```hcl
+backend "s3" {
+  bucket         = "<state_bucket_name output>"
+  key            = "dev/homelab.tfstate"
+  dynamodb_table = "<dynamodb_table_name output>"
+  region         = "us-east-1"
+  encrypt        = true
+}
+```
 
 ### Dev environment (real AWS)
 
