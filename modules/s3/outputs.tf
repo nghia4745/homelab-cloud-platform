@@ -19,3 +19,8 @@ output "dynamodb_table_arn" {
   description = "ARN of the DynamoDB table used for Terraform state locking"
   value       = aws_dynamodb_table.lock.arn
 }
+
+output "dynamodb_kms_key_arn" {
+  description = "ARN of the CMK used for DynamoDB table encryption"
+  value       = local.dynamodb_kms_key_arn
+}

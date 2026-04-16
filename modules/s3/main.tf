@@ -9,8 +9,9 @@ locals {
   default_bucket_name = "${var.project_name}-${var.environment}-tfstate-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.region}"
   default_table_name  = "${var.project_name}-${var.environment}-tfstate-lock"
 
-  state_bucket_name = var.bucket_name != "" ? var.bucket_name : local.default_bucket_name
-  lock_table_name   = var.dynamodb_table_name != "" ? var.dynamodb_table_name : local.default_table_name
+  state_bucket_name    = var.bucket_name != "" ? var.bucket_name : local.default_bucket_name
+  lock_table_name      = var.dynamodb_table_name != "" ? var.dynamodb_table_name : local.default_table_name
+  dynamodb_kms_key_arn = var.dynamodb_kms_key_arn != "" ? var.dynamodb_kms_key_arn : aws_kms_key.dynamodb[0].arn
 
   common_tags = merge(var.tags, {
     Project     = var.project_name
@@ -18,6 +19,25 @@ locals {
     ManagedBy   = "terraform"
     Module      = "s3"
   })
+}
+
+resource "aws_kms_key" "dynamodb" {
+  count = var.dynamodb_kms_key_arn == "" ? 1 : 0
+
+  description             = "CMK for DynamoDB state lock table encryption"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  tags = merge(local.common_tags, {
+    Name = "${local.lock_table_name}-cmk"
+  })
+}
+
+resource "aws_kms_alias" "dynamodb" {
+  count = var.dynamodb_kms_key_arn == "" ? 1 : 0
+
+  name          = "alias/${local.lock_table_name}-cmk"
+  target_key_id = aws_kms_key.dynamodb[0].key_id
 }
 
 resource "aws_s3_bucket" "state" {
@@ -101,7 +121,8 @@ resource "aws_dynamodb_table" "lock" {
   }
 
   server_side_encryption {
-    enabled = true
+    enabled     = true
+    kms_key_arn = local.dynamodb_kms_key_arn
   }
 
   tags = merge(local.common_tags, {

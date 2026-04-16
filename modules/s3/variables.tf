@@ -22,6 +22,12 @@ variable "dynamodb_table_name" {
   default     = ""
 }
 
+variable "dynamodb_kms_key_arn" {
+  description = "Optional existing CMK ARN for DynamoDB table encryption. Leave empty to create one in this module."
+  type        = string
+  default     = ""
+}
+
 variable "force_destroy" {
   description = "Allow bucket/table destruction during Terraform destroy (useful for learning env)"
   type        = bool
