@@ -18,6 +18,7 @@ locals {
     Environment = var.environment
     ManagedBy   = "terraform"
     Module      = "s3"
+    Owner       = lookup(var.tags, "Owner", "unknown")
   })
 }
 
