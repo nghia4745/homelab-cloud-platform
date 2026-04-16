@@ -27,7 +27,15 @@ jobs:
 
       - name: Install terraform-docs
         run: |
+          TERRAFORM_DOCS_BIN="$HOME/.local/bin/terraform-docs"
+
           if command -v terraform-docs >/dev/null 2>&1; then
+            terraform-docs --version
+            exit 0
+          fi
+
+          if [ -x "$TERRAFORM_DOCS_BIN" ]; then
+            export PATH="$HOME/.local/bin:$PATH"
             terraform-docs --version
             exit 0
           fi
@@ -48,7 +56,8 @@ jobs:
           curl -sSL "https://github.com/terraform-docs/terraform-docs/releases/download/${VERSION}/terraform-docs-${VERSION}-${OS}-${ARCH}.tar.gz" -o /tmp/terraform-docs.tar.gz
           tar -xzf /tmp/terraform-docs.tar.gz -C /tmp
           chmod +x /tmp/terraform-docs
-          mv /tmp/terraform-docs "$HOME/.local/bin/terraform-docs"
+          mv /tmp/terraform-docs "$TERRAFORM_DOCS_BIN"
+          export PATH="$HOME/.local/bin:$PATH"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           terraform-docs --version
       
