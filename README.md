@@ -41,6 +41,10 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │   ├── security-scan.yml          # Runs Checkov security scans
 │   ├── infracost.yml              # Estimates infrastructure costs on PRs
 │   ├── drift-detection.yml        # Hourly drift detection via Terraform plan
+├── app/                           # Phase 3 sample Flask API
+│   ├── main.py                    # /health, /api/greeting, /metrics endpoints
+│   └── requirements.txt           # Python runtime dependencies
+├── Dockerfile                     # Multi-stage container build for app/
 ├── Makefile                       # Convenience targets for local stacks
 └── README.md                      # This file
 ```
@@ -172,6 +176,65 @@ The `environments/dev` stack provisions real AWS resources using the `modules/ne
 - **EKS cluster**: one control plane running Kubernetes `1.32` with public and private API endpoint access enabled
 - **EKS managed node group**: worker nodes in private subnets using `t3.medium` instances with min/desired/max scaling of `1/2/3`
 
+## 🐳 Phase 3: Application + Containerization
+
+The project now includes a minimal Flask API and a production-oriented container image build.
+
+### What was added
+
+- `app/main.py`
+  - `GET /health`: service health endpoint for container/Kubernetes probes
+  - `GET /api/greeting`: simple API response
+  - `GET /metrics`: Prometheus-compatible metrics output
+  - Custom metric `app_requests_total` labeled by endpoint
+- `app/requirements.txt`
+  - `flask`, `prometheus-client`, and `gunicorn` are pinned for reproducible builds
+- `Dockerfile`
+  - Multi-stage build (`builder` -> `runtime`)
+  - Runs as non-root user (`appuser`) for safer defaults
+  - Exposes container port `8080`
+  - Starts app with Gunicorn (`main:app`) instead of Flask dev server
+
+### Why this design
+
+- Multi-stage build keeps runtime image smaller and cleaner.
+- Gunicorn is the production WSGI server; Flask dev server is for local dev only.
+- `/metrics` makes the app ready for Prometheus/Grafana in a later observability phase.
+- Endpoint-level counters validate traffic flow quickly during testing.
+
+### Run the app locally (without Docker)
+
+```bash
+cd app
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+In another terminal:
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/api/greeting
+curl http://localhost:8080/metrics
+```
+
+### Build and run container locally
+
+```bash
+docker build -t homelab-api:v1 .
+docker run --rm -p 8080:8080 homelab-api:v1
+```
+
+Then verify:
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/api/greeting
+curl http://localhost:8080/metrics
+```
+
 ## 🔐 Configuration
 
 ### Variables
@@ -181,6 +244,8 @@ db_password = "your-secure-password-here"
 ```
 
 > ⚠️ **Security Note**: `secret.auto.tfvars` is auto-loaded and should be git-ignored. Keep sensitive values out of version control.
+
+For local Python development, `.venv/` is also git-ignored and should not be committed.
 
 For AWS dev stack values, edit `environments/dev/dev.auto.tfvars`.
 This controls networking, IAM wiring context, ECR repository names, and EKS cluster/node-group sizing.
