@@ -12,7 +12,7 @@ RUN useradd -m -u 1000 appuser
 
 WORKDIR /app
 
-COPY --from=builder /root/.local /home/appuser/.local
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 COPY app/main.py .
 
 ENV PATH=/home/appuser/.local/bin:$PATH \
@@ -23,5 +23,3 @@ USER appuser
 EXPOSE 8080
 
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "main:app"]
-
-# TEST

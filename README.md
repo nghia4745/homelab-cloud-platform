@@ -46,7 +46,6 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │   ├── main.py                    # /health, /api/greeting, /metrics endpoints
 │   └── requirements.txt           # Python runtime dependencies
 ├── Dockerfile                     # Multi-stage container build for app/
-├── .dockerignore                  # Excludes unnecessary files from Docker build context
 ├── Makefile                       # Convenience targets for local stacks
 └── README.md                      # This file
 ```
