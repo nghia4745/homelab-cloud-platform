@@ -235,6 +235,57 @@ curl http://localhost:8080/api/greeting
 curl http://localhost:8080/metrics
 ```
 
+### Push to GitHub Container Registry (GHCR)
+
+#### Manual push (one-time verification)
+
+1. Create a GitHub Personal Access Token with `write:packages` scope:
+   - Go to https://github.com/settings/tokens
+   - Click "Generate new token (classic)"
+   - Select scopes: `write:packages`, `read:packages`, `delete:packages`
+   - Copy the token
+
+2. Login to GHCR:
+   ```bash
+   export GITHUB_TOKEN=<your-token>
+   echo $GITHUB_TOKEN | docker login ghcr.io -u <your-github-username> --password-stdin
+   ```
+
+3. Tag and push:
+   ```bash
+   export IMAGE_TAG=sha-$(git rev-parse --short=12 HEAD)
+   docker tag homelab-api:v1 ghcr.io/nghia4745/homelab-api:$IMAGE_TAG
+   docker tag homelab-api:v1 ghcr.io/nghia4745/homelab-api:latest
+   docker push ghcr.io/nghia4745/homelab-api:$IMAGE_TAG
+   docker push ghcr.io/nghia4745/homelab-api:latest
+   ```
+
+4. Verify in GitHub:
+   - Visit https://github.com/nghia4745?tab=packages
+   - Confirm `homelab-api` package appears with the SHA tag
+
+#### Automated push via GitHub Actions
+
+The `.github/workflows/build-and-push.yml` workflow automates this process:
+
+- **On PR**: Builds image and runs Trivy vulnerability scan (no push)
+- **On push to main/dev**: Builds image, scans with Trivy, pushes both `sha-<short-commit>` and `latest` tags to GHCR
+
+The workflow uses:
+- `docker/setup-buildx-action`: enables multi-stage build caching
+- `aquasecurity/trivy-action`: scans for container vulnerabilities
+- `github/codeql-action/upload-sarif`: reports scan results to GitHub Security tab
+- `secrets.GITHUB_TOKEN`: automatically available; no additional secrets needed
+
+To trigger a push, commit and push to main or dev branch:
+```bash
+git add .
+git commit -m "Phase 3: Containerization and GHCR push"
+git push origin dev
+```
+
+The workflow will automatically build, scan, and push to GHCR.
+
 ## 🔐 Configuration
 
 ### Variables
