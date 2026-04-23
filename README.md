@@ -46,6 +46,7 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │   ├── main.py                    # /health, /api/greeting, /metrics endpoints
 │   └── requirements.txt           # Python runtime dependencies
 ├── Dockerfile                     # Multi-stage container build for app/
+├── .dockerignore                  # Excludes unnecessary files from Docker build context
 ├── Makefile                       # Convenience targets for local stacks
 └── README.md                      # This file
 ```
@@ -270,7 +271,8 @@ curl http://localhost:8080/metrics
 The `.github/workflows/build-and-push.yml` workflow automates this process:
 
 - **Runs on**: Self-hosted runner (requires Docker and Buildx available locally)
-- **On PR**: Builds image and runs Trivy vulnerability scan (no push)
+- **On PR (same repository)**: Builds image and runs Trivy vulnerability scan (no push)
+- **On PR from forks**: Job is skipped by guardrail to avoid restricted-token permission failures
 - **On push to main/dev**: Builds image, scans with Trivy, pushes both `sha-<short-commit>` and `latest` tags to GHCR
 
 The workflow:

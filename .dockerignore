@@ -1,0 +1,12 @@
+.git
+.gitignore
+.github
+.terraform
+.venv
+.vscode
+terraform.tfstate*
+*.tfvars
+README.md
+modules/
+environments/
+policies/
