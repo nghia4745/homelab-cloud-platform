@@ -41,10 +41,12 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │   ├── security-scan.yml          # Runs Checkov security scans
 │   ├── infracost.yml              # Estimates infrastructure costs on PRs
 │   ├── drift-detection.yml        # Hourly drift detection via Terraform plan
+│   └── build-and-push.yml         # Builds, scans, and pushes container to GHCR
 ├── app/                           # Phase 3 sample Flask API
 │   ├── main.py                    # /health, /api/greeting, /metrics endpoints
 │   └── requirements.txt           # Python runtime dependencies
 ├── Dockerfile                     # Multi-stage container build for app/
+├── .dockerignore                  # Excludes unnecessary files from Docker build context
 ├── Makefile                       # Convenience targets for local stacks
 └── README.md                      # This file
 ```
@@ -268,14 +270,32 @@ curl http://localhost:8080/metrics
 
 The `.github/workflows/build-and-push.yml` workflow automates this process:
 
+- **Runs on**: Self-hosted runner (requires Docker and Buildx available locally)
 - **On PR**: Builds image and runs Trivy vulnerability scan (no push)
 - **On push to main/dev**: Builds image, scans with Trivy, pushes both `sha-<short-commit>` and `latest` tags to GHCR
 
-The workflow uses:
-- `docker/setup-buildx-action`: enables multi-stage build caching
-- `aquasecurity/trivy-action`: scans for container vulnerabilities
-- `github/codeql-action/upload-sarif`: reports scan results to GitHub Security tab
-- `secrets.GITHUB_TOKEN`: automatically available; no additional secrets needed
+The workflow:
+- Uses `docker/setup-buildx-action` for multi-stage build caching
+- Runs `aquasecurity/trivy-action` to scan for container vulnerabilities
+- Uploads results to GitHub Security tab via `github/codeql-action/upload-sarif`
+- Authenticates with `secrets.GITHUB_TOKEN` (built-in, no secrets setup needed)
+- Requires these repository permissions:
+  - `contents: read`
+  - `packages: write`
+  - `security-events: write`
+  - `actions: read`
+
+**Important**: After the workflow creates the GHCR package, you must grant repository access:
+
+1. Go to your GitHub packages: https://github.com/nghia4745?tab=packages
+2. Click the `homelab-api` package
+3. Click **Package settings**
+4. Under **Manage Actions access**, add repository `nghia4745/homelab-cloud-platform`
+5. Enable "Inherit access from repository" if available
+
+Also ensure your repository has workflow permissions enabled:
+- Repository → Settings → Actions → General
+- Set **Workflow permissions** to `Read and write permissions`
 
 To trigger a push, commit and push to main or dev branch:
 ```bash
@@ -285,6 +305,27 @@ git push origin dev
 ```
 
 The workflow will automatically build, scan, and push to GHCR.
+
+#### Build context optimization
+
+The `.dockerignore` file excludes unnecessary files from the Docker build context, reducing build time and image size:
+
+```
+.git
+.gitignore
+.github
+.terraform
+.venv
+.vscode
+terraform.tfstate*
+*.tfvars
+README.md
+modules/
+environments/
+policies/
+```
+
+Only `app/`, `Dockerfile`, and required config files are included in the build context.
 
 ## 🔐 Configuration
 
