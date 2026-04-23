@@ -1,0 +1,14 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+# Cluster name is used in kubeconfig context (kind-homelab).
+name: homelab
+nodes:
+  # Control-plane node also exposes a host port so local curl can reach the service.
+  - role: control-plane
+    extraPortMappings:
+      # Traffic flow: localhost:8080 -> nodePort:30080 -> Service:80 -> Pod:8080.
+      - containerPort: 30080
+        hostPort: 8080
+        protocol: TCP
+  # Single worker is enough for this learning setup.
+  - role: worker

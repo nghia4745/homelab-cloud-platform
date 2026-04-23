@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homelab-api
+  namespace: homelab
+spec:
+  # Keep two replicas for basic high availability in local testing.
+  replicas: 2
+  selector:
+    matchLabels:
+      app: homelab-api
+  template:
+    metadata:
+      labels:
+        app: homelab-api
+    spec:
+      # Pull credentials for private GHCR images.
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: homelab-api
+          # Immutable image tag keeps deployments reproducible.
+          image: ghcr.io/nghia4745/homelab-api:sha-3342997e95e3
+          # Load all key/value pairs from ConfigMap as environment variables.
+          envFrom:
+            - configMapRef:
+                name: homelab-api-config
+          ports:
+            - containerPort: 8080
+          # Pod is Ready only after /health responds successfully.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # Restart pod if health endpoint fails repeatedly.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            # Requests reserve baseline capacity for scheduling.
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            # Limits cap usage so one pod cannot starve the node.
+            limits:
+              cpu: 250m
+              memory: 128Mi
