@@ -41,6 +41,11 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │   ├── security-scan.yml          # Runs Checkov security scans
 │   ├── infracost.yml              # Estimates infrastructure costs on PRs
 │   ├── drift-detection.yml        # Hourly drift detection via Terraform plan
+│   └── build-and-push.yml         # Builds, scans, and pushes container to GHCR
+├── app/                           # Phase 3 sample Flask API
+│   ├── main.py                    # /health, /api/greeting, /metrics endpoints
+│   └── requirements.txt           # Python runtime dependencies
+├── Dockerfile                     # Multi-stage container build for app/
 ├── Makefile                       # Convenience targets for local stacks
 └── README.md                      # This file
 ```
@@ -172,6 +177,155 @@ The `environments/dev` stack provisions real AWS resources using the `modules/ne
 - **EKS cluster**: one control plane running Kubernetes `1.32` with public and private API endpoint access enabled
 - **EKS managed node group**: worker nodes in private subnets using `t3.medium` instances with min/desired/max scaling of `1/2/3`
 
+## 🐳 Phase 3: Application + Containerization
+
+The project now includes a minimal Flask API and a production-oriented container image build.
+
+### What was added
+
+- `app/main.py`
+  - `GET /health`: service health endpoint for container/Kubernetes probes
+  - `GET /api/greeting`: simple API response
+  - `GET /metrics`: Prometheus-compatible metrics output
+  - Custom metric `app_requests_total` labeled by endpoint
+- `app/requirements.txt`
+  - `flask`, `prometheus-client`, and `gunicorn` are pinned for reproducible builds
+- `Dockerfile`
+  - Multi-stage build (`builder` -> `runtime`)
+  - Runs as non-root user (`appuser`) for safer defaults
+  - Exposes container port `8080`
+  - Starts app with Gunicorn (`main:app`) instead of Flask dev server
+
+### Why this design
+
+- Multi-stage build keeps runtime image smaller and cleaner.
+- Gunicorn is the production WSGI server; Flask dev server is for local dev only.
+- `/metrics` makes the app ready for Prometheus/Grafana in a later observability phase.
+- Endpoint-level counters validate traffic flow quickly during testing.
+
+### Run the app locally (without Docker)
+
+```bash
+cd app
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+In another terminal:
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/api/greeting
+curl http://localhost:8080/metrics
+```
+
+### Build and run container locally
+
+```bash
+docker build -t homelab-api:v1 .
+docker run --rm -p 8080:8080 homelab-api:v1
+```
+
+Then verify:
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/api/greeting
+curl http://localhost:8080/metrics
+```
+
+### Push to GitHub Container Registry (GHCR)
+
+#### Manual push (one-time verification)
+
+1. Create a GitHub Personal Access Token with `write:packages` scope:
+   - Go to https://github.com/settings/tokens
+   - Click "Generate new token (classic)"
+   - Select scopes: `write:packages`, `read:packages`, `delete:packages`
+   - Copy the token
+
+2. Login to GHCR:
+   ```bash
+   export GITHUB_TOKEN=<your-token>
+   echo $GITHUB_TOKEN | docker login ghcr.io -u <your-github-username> --password-stdin
+   ```
+
+3. Tag and push:
+   ```bash
+   export IMAGE_TAG=sha-$(git rev-parse --short=12 HEAD)
+   docker tag homelab-api:v1 ghcr.io/nghia4745/homelab-api:$IMAGE_TAG
+   docker tag homelab-api:v1 ghcr.io/nghia4745/homelab-api:latest
+   docker push ghcr.io/nghia4745/homelab-api:$IMAGE_TAG
+   docker push ghcr.io/nghia4745/homelab-api:latest
+   ```
+
+4. Verify in GitHub:
+   - Visit https://github.com/nghia4745?tab=packages
+   - Confirm `homelab-api` package appears with the SHA tag
+
+#### Automated push via GitHub Actions
+
+The `.github/workflows/build-and-push.yml` workflow automates this process:
+
+- **Runs on**: Self-hosted runner (requires Docker and Buildx available locally)
+- **On PR**: Builds image and runs Trivy vulnerability scan (no push)
+- **On push to main/dev**: Builds image, scans with Trivy, pushes both `sha-<short-commit>` and `latest` tags to GHCR
+
+The workflow:
+- Uses `docker/setup-buildx-action` for multi-stage build caching
+- Runs `aquasecurity/trivy-action` to scan for container vulnerabilities
+- Uploads results to GitHub Security tab via `github/codeql-action/upload-sarif`
+- Authenticates with `secrets.GITHUB_TOKEN` (built-in, no secrets setup needed)
+- Requires these repository permissions:
+  - `contents: read`
+  - `packages: write`
+  - `security-events: write`
+  - `actions: read`
+
+**Important**: After the workflow creates the GHCR package, you must grant repository access:
+
+1. Go to your GitHub packages: https://github.com/nghia4745?tab=packages
+2. Click the `homelab-api` package
+3. Click **Package settings**
+4. Under **Manage Actions access**, add repository `nghia4745/homelab-cloud-platform`
+5. Enable "Inherit access from repository" if available
+
+Also ensure your repository has workflow permissions enabled:
+- Repository → Settings → Actions → General
+- Set **Workflow permissions** to `Read and write permissions`
+
+To trigger a push, commit and push to main or dev branch:
+```bash
+git add .
+git commit -m "Phase 3: Containerization and GHCR push"
+git push origin dev
+```
+
+The workflow will automatically build, scan, and push to GHCR.
+
+#### Build context optimization
+
+The `.dockerignore` file excludes unnecessary files from the Docker build context, reducing build time and image size:
+
+```
+.git
+.gitignore
+.github
+.terraform
+.venv
+.vscode
+terraform.tfstate*
+*.tfvars
+README.md
+modules/
+environments/
+policies/
+```
+
+Only `app/`, `Dockerfile`, and required config files are included in the build context.
+
 ## 🔐 Configuration
 
 ### Variables
@@ -181,6 +335,8 @@ db_password = "your-secure-password-here"
 ```
 
 > ⚠️ **Security Note**: `secret.auto.tfvars` is auto-loaded and should be git-ignored. Keep sensitive values out of version control.
+
+For local Python development, `.venv/` is also git-ignored and should not be committed.
 
 For AWS dev stack values, edit `environments/dev/dev.auto.tfvars`.
 This controls networking, IAM wiring context, ECR repository names, and EKS cluster/node-group sizing.
