@@ -96,3 +96,7 @@ jobs:
       - name: Delete integration cluster
         if: always()
         run: kind delete cluster --name integration
+      
+      - name: Switch back to kind-homelab context
+        if: always()
+        run: kubectl config use-context kind-homelab
