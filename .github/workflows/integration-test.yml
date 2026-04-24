@@ -89,7 +89,7 @@ jobs:
             curl --fail http://localhost:18080/api/greeting
 
             echo "--- /metrics ---"
-            curl --fail http://localhost:18080/metrics | grep -q "homelab_request_count_total" \
+            curl --fail http://localhost:18080/metrics | grep -q "app_requests_total" \
               && echo "metrics OK"
 
       # always() ensures cleanup even if a step above fails
