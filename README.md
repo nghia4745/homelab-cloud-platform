@@ -323,6 +323,8 @@ The application is deployed to a local Kind cluster using private images from GH
 - `kind/cluster.yml`
   - Defines a two-node Kind cluster (`control-plane` + `worker`)
   - Maps host port `8080` to Kubernetes NodePort `30080` for local access
+- `k8s/namespace.yml`
+  - Creates the `homelab` namespace
 - `k8s/deployment.yml`
   - Runs `homelab-api` in namespace `homelab`
   - Pulls private image via `ghcr-pull-secret`
@@ -338,6 +340,33 @@ The application is deployed to a local Kind cluster using private images from GH
   - Externalized environment settings (`APP_ENV`, `LOG_LEVEL`)
 - `k8s/hpa.yml`
   - Configures autoscaling from 2 to 5 replicas at 60% CPU target
+
+### Prerequisites
+
+**1. Create the Kind cluster**
+
+```bash
+kind create cluster --config kind/cluster.yml
+```
+
+**2. Create the `homelab` namespace**
+
+```bash
+kubectl apply -f k8s/namespace.yml
+```
+
+**3. Create the GHCR pull secret**
+
+Required to pull the private image from GHCR:
+
+```bash
+kubectl create secret docker-registry ghcr-pull-secret \
+  --namespace homelab \
+  --docker-server=ghcr.io \
+  --docker-username=<github-username> \
+  --docker-password=<github-personal-access-token-with-read:packages> \
+  --docker-email=<email>
+```
 
 ### Apply and verify
 
