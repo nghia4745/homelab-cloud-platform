@@ -71,7 +71,7 @@ jobs:
         run: |
           kubectl rollout status deployment/homelab-api \
             --namespace homelab \
-            -- context kind-integration \
+            --context kind-integration \
             --timeout=120s
         
       # Port 18080 avoids collision with the dev cluster on 8080.
