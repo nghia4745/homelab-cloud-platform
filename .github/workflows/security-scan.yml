@@ -48,7 +48,7 @@ jobs:
       AWS_DEFAULT_REGION: "us-east-1"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run Checkov on local machine (with Custom Policies)
         run: |

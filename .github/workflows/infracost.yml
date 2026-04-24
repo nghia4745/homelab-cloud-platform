@@ -22,7 +22,7 @@ jobs:
     steps:
       # Step 1: Checkout the base branch to generate a baseline cost estimate.
       - name: Checkout base branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.base.ref }}
 
@@ -35,7 +35,7 @@ jobs:
 
       # Step 3: Checkout the PR branch to compare against the baseline.
       - name: Checkout PR branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Step 4: Generate the cost difference between base and PR branches.
       - name: Generate Infracost diff
