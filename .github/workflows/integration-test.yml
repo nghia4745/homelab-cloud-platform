@@ -1,0 +1,98 @@
+name: Integration Test
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  integration-test:
+    runs-on: self-hosted
+    # Skip fork PRs — they cannot access runner secrets.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      # Build image from source - no GHCR pull needed for tests
+      - name: Build test image
+        run: docker build -t homelab-api:test .
+      
+      # Isolated cluster so never conflicts with the dev cluster.
+      - name: Create Kind integration cluster
+        run: kind create cluster --name integration --wait 60s
+
+      # Load the locally built image directly - no registry, no pull secret needed.
+      - name: Load test image into Kind
+        run: kind load docker-image homelab-api:test --name integration
+      
+      - name: Apply namespace and ConfigMap
+        run: |
+          kubectl apply -f k8s/namespace.yml --context kind-integration
+          kubectl apply -f k8s/configmap.yml --context kind-integration
+      
+      # Deployment manifest references ghcr-pull-secret - create a placeholder
+      # so the pod spec is valid even though no pull will happen.
+      - name: Create placeholder pull secret
+        run: |
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --namespace homelab \
+            --docker-server=ghcr.io \
+            --docker-username=placeholder \
+            --docker-password=placeholder \
+            --namespace homelab \
+            --context kind-integration
+      
+      - name: Apply Deployment and Service
+        run: |
+          kubectl apply -f k8s/deployment.yml --context kind-integration
+          kubectl apply -f k8s/service.yml --context kind-integration
+
+      # Override the pinned GHCR image and disable remote pull -
+      # the image was loaded into the node above.
+      - name: Patch deployment to use local test image
+        run: |
+          kubectl set image deployment/homelab-api \
+            homelab-api=homelab-api:test \
+            --namespace homelab \
+            --context kind-integration
+          kubectl patch deployment/homelab-api \
+            --namespace homelab \
+            --context kind-integration \
+            --type='json' \
+            --patch='[{"op": "remove", "path": "/spec/template/spec/imagePullSecrets"}]'
+      
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/homelab-api \
+            --namespace homelab \
+            -- context kind-integration \
+            --timeout=120s
+        
+      # Port 18080 avoids collision with the dev cluster on 8080.
+      - name: Validate endpoints
+        run: |
+          kubectl port-forward service/homelab-api 18080:80 \
+            --namespace homelab \
+            --context kind-integration &
+            sleep 3
+
+            echo "--- /health ---"
+            curl --fail http://localhost:18080/health
+
+            echo "--- /api/greeting ---"
+            curl --fail http://localhost:18080/api/greeting
+
+            echo "--- /metrics ---"
+            curl --fail http://localhost:18080/metrics | grep -q "homelab_request_count_total" \
+              && echo "metrics OK"
+
+      # always() ensures cleanup even if a step above fails
+      - name: Delete integration cluster
+        if: always()
+        run: kind delete cluster --name integration

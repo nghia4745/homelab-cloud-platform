@@ -7,13 +7,12 @@ spec:
   # Route traffic to pods created by the homelab-api Deployment.
   selector:
     app: homelab-api
-  # NodePort is the simplest way to expose traffic in Kind without an ingress.
-  type: NodePort
+  # ClusterIP is the default and simplest way to expose traffic within the cluster.
+  type: ClusterIP
   ports:
   # Expose service port 80 and forward to container port 8080.
   - port: 80
     targetPort: 8080
     # Must match kind extraPortMappings containerPort in kind/cluster.yml.
-    nodePort: 30080
     protocol: TCP
 

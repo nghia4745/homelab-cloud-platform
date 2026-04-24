@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  # Routes external HTTP traffic into the homelab-api Service.
+  name: homelab-api
+  namespace: homelab
+  annotations:
+    # Tell Kubernetes which Ingress controller should handle this resource.
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  # Must match the IngressClass installed by ingress-nginx Helm chart.
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: homelab-api
+                port:
+                  number: 80
