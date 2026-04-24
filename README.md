@@ -45,6 +45,13 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 ├── app/                           # Phase 3 sample Flask API
 │   ├── main.py                    # /health, /api/greeting, /metrics endpoints
 │   └── requirements.txt           # Python runtime dependencies
+├── kind/
+│   └── cluster.yml                # Kind cluster definition and local port mapping
+├── k8s/
+│   ├── deployment.yml             # homelab-api Deployment (probes, resources, image pull)
+│   ├── service.yml                # NodePort Service exposing homelab-api
+│   ├── configmap.yml              # Runtime app configuration
+│   └── hpa.yml                    # Horizontal Pod Autoscaler for homelab-api
 ├── Dockerfile                     # Multi-stage container build for app/
 ├── .dockerignore                  # Excludes unnecessary files from Docker build context
 ├── Makefile                       # Convenience targets for local stacks
@@ -306,6 +313,85 @@ git push origin dev
 ```
 
 The workflow will automatically build, scan, and push to GHCR.
+
+## ☸️ Phase 4: Kubernetes Deployment on Kind
+
+The application is deployed to a local Kind cluster using private images from GHCR.
+
+### What was added
+
+- `kind/cluster.yml`
+  - Defines a two-node Kind cluster (`control-plane` + `worker`)
+  - Maps host port `8080` to Kubernetes NodePort `30080` for local access
+- `k8s/namespace.yml`
+  - Creates the `homelab` namespace
+- `k8s/deployment.yml`
+  - Runs `homelab-api` in namespace `homelab`
+  - Pulls private image via `ghcr-pull-secret`
+  - Uses health probes on `/health`
+  - Sets CPU and memory requests/limits
+  - Uses immutable image tag (`sha-...`) for reproducible deploys
+  - Loads runtime config from `ConfigMap`
+- `k8s/service.yml`
+  - Exposes Deployment as `NodePort` service
+  - Routes service port `80` to container port `8080`
+  - Uses fixed node port `30080` for stable local endpoint mapping
+- `k8s/configmap.yml`
+  - Externalized environment settings (`APP_ENV`, `LOG_LEVEL`)
+- `k8s/hpa.yml`
+  - Configures autoscaling from 2 to 5 replicas at 60% CPU target
+
+### Prerequisites
+
+**1. Create the Kind cluster**
+
+```bash
+kind create cluster --config kind/cluster.yml
+```
+
+**2. Create the `homelab` namespace**
+
+```bash
+kubectl apply -f k8s/namespace.yml
+```
+
+**3. Create the GHCR pull secret**
+
+Required to pull the private image from GHCR:
+
+```bash
+kubectl create secret docker-registry ghcr-pull-secret \
+  --namespace homelab \
+  --docker-server=ghcr.io \
+  --docker-username=<github-username> \
+  --docker-password=<github-personal-access-token-with-read:packages> \
+  --docker-email=<email>
+```
+
+### Apply and verify
+
+```bash
+# Apply/update all Kubernetes manifests
+kubectl apply -f k8s/configmap.yml
+kubectl apply -f k8s/deployment.yml
+kubectl apply -f k8s/service.yml
+kubectl apply -f k8s/hpa.yml
+
+# Check rollout and resources
+kubectl -n homelab rollout status deployment/homelab-api
+kubectl -n homelab get deploy,pods,svc,hpa
+
+# Verify app endpoints through Kind port mapping
+curl http://localhost:8080/health
+curl http://localhost:8080/api/greeting
+curl http://localhost:8080/metrics
+```
+
+### Notes
+
+- `kubectl get hpa` may show `cpu: <unknown>/60%` in Kind until metrics-server is installed.
+- With the current setup, application traffic path is:
+  `localhost:8080 -> kind control-plane:30080 -> Service:80 -> Pod:8080`
 
 #### Build context optimization
 
