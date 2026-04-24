@@ -15,6 +15,13 @@ spec:
         app: homelab-api
     spec:
       # Pull credentials for private GHCR images.
+      # Create this secret in the same namespace before applying the Deployment:
+      # kubectl create secret docker-registry ghcr-pull-secret \
+      #   --namespace homelab \
+      #   --docker-server=ghcr.io \
+      #   --docker-username=<github-username> \
+      #   --docker-password=<github-personal-access-token-with-read:packages> \
+      #   --docker-email=<email>
       imagePullSecrets:
         - name: ghcr-pull-secret
       containers:
