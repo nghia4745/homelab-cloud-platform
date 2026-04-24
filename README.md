@@ -1,6 +1,6 @@
 ```markdown
 # Terraform DevOps Learning Project
-![Security Scan](https://github.com/nghia4745/homelab-cloud-platform/actions/workflows/security-scan.yml/badge.svg)
+![Security Scan](https://github.com/nghia4745/homelab-cloud-platform/actions/workflows/security-scan.yaml/badge.svg)
 
 A hands-on Terraform project demonstrating infrastructure-as-code concepts with Docker, Vault secret management, AWS resources, custom security policies, and CI/CD automation.
 
@@ -36,22 +36,25 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │   ├── eks/                       # EKS control plane and managed node group
 │   └── s3/                        # Terraform state backend bucket and lock table
 ├── policies/                      # Custom Checkov security policies
-│   └── tagging_policy.yml         # Enforces Owner tag on S3 buckets
+│   └── tagging_policy.yaml        # Enforces Owner tag on S3 buckets
 ├── .github/workflows/             # GitHub Actions CI/CD workflows
-│   ├── security-scan.yml          # Runs Checkov security scans
-│   ├── infracost.yml              # Estimates infrastructure costs on PRs
-│   ├── drift-detection.yml        # Hourly drift detection via Terraform plan
-│   └── build-and-push.yml         # Builds, scans, and pushes container to GHCR
+│   ├── security-scan.yaml         # Runs Checkov security scans
+│   ├── infracost.yaml             # Estimates infrastructure costs on PRs
+│   ├── drift-detection.yaml       # Hourly drift detection via Terraform plan
+│   ├── build-and-push.yaml        # Builds, scans, and pushes container to GHCR
+│   └── integration-test.yaml      # Runs Kind-based Kubernetes integration tests
 ├── app/                           # Phase 3 sample Flask API
 │   ├── main.py                    # /health, /api/greeting, /metrics endpoints
 │   └── requirements.txt           # Python runtime dependencies
 ├── kind/
-│   └── cluster.yml                # Kind cluster definition and local port mapping
+│   └── cluster.yaml               # Kind cluster definition and local port mapping
 ├── k8s/
-│   ├── deployment.yml             # homelab-api Deployment (probes, resources, image pull)
-│   ├── service.yml                # NodePort Service exposing homelab-api
-│   ├── configmap.yml              # Runtime app configuration
-│   └── hpa.yml                    # Horizontal Pod Autoscaler for homelab-api
+│   ├── namespace.yaml             # Dedicated namespace for workloads
+│   ├── deployment.yaml            # homelab-api Deployment (probes, resources, image pull)
+│   ├── service.yaml               # ClusterIP Service for in-cluster routing
+│   ├── ingress.yaml               # Ingress rule routing HTTP traffic to service
+│   ├── configmap.yaml             # Runtime app configuration
+│   └── hpa.yaml                   # Horizontal Pod Autoscaler for homelab-api
 ├── Dockerfile                     # Multi-stage container build for app/
 ├── .dockerignore                  # Excludes unnecessary files from Docker build context
 ├── Makefile                       # Convenience targets for local stacks
@@ -275,7 +278,7 @@ curl http://localhost:8080/metrics
 
 #### Automated push via GitHub Actions
 
-The `.github/workflows/build-and-push.yml` workflow automates this process:
+The `.github/workflows/build-and-push.yaml` workflow automates this process:
 
 - **Runs on**: Self-hosted runner (requires Docker and Buildx available locally)
 - **On PR (same repository)**: Builds image and runs Trivy vulnerability scan (no push)
@@ -320,39 +323,47 @@ The application is deployed to a local Kind cluster using private images from GH
 
 ### What was added
 
-- `kind/cluster.yml`
+- `kind/cluster.yaml`
   - Defines a two-node Kind cluster (`control-plane` + `worker`)
-  - Maps host port `8080` to Kubernetes NodePort `30080` for local access
-- `k8s/namespace.yml`
+  - Maps host port `8080` to ingress-nginx NodePort `30080` for local access
+- `k8s/namespace.yaml`
   - Creates the `homelab` namespace
-- `k8s/deployment.yml`
+- `k8s/deployment.yaml`
   - Runs `homelab-api` in namespace `homelab`
   - Pulls private image via `ghcr-pull-secret`
   - Uses health probes on `/health`
   - Sets CPU and memory requests/limits
   - Uses immutable image tag (`sha-...`) for reproducible deploys
   - Loads runtime config from `ConfigMap`
-- `k8s/service.yml`
-  - Exposes Deployment as `NodePort` service
+- `k8s/service.yaml`
+  - Exposes Deployment as `ClusterIP` service (Ingress backend)
   - Routes service port `80` to container port `8080`
-  - Uses fixed node port `30080` for stable local endpoint mapping
-- `k8s/configmap.yml`
+  - Internal-only service access for ingress controller routing
+- `k8s/ingress.yaml`
+  - Routes HTTP path `/` to `homelab-api` service
+  - Uses ingress class `nginx`
+- `k8s/configmap.yaml`
   - Externalized environment settings (`APP_ENV`, `LOG_LEVEL`)
-- `k8s/hpa.yml`
+- `k8s/hpa.yaml`
   - Configures autoscaling from 2 to 5 replicas at 60% CPU target
+- `ingress-nginx` controller (installed via Helm)
+  - Terminates incoming HTTP and forwards traffic to Service `homelab-api`
+- `.github/workflows/integration-test.yaml`
+  - Creates ephemeral Kind cluster in CI
+  - Deploys manifests and validates `/health`, `/api/greeting`, and `/metrics`
 
 ### Prerequisites
 
 **1. Create the Kind cluster**
 
 ```bash
-kind create cluster --config kind/cluster.yml
+kind create cluster --config kind/cluster.yaml
 ```
 
 **2. Create the `homelab` namespace**
 
 ```bash
-kubectl apply -f k8s/namespace.yml
+kubectl apply -f k8s/namespace.yaml
 ```
 
 **3. Create the GHCR pull secret**
@@ -372,14 +383,18 @@ kubectl create secret docker-registry ghcr-pull-secret \
 
 ```bash
 # Apply/update all Kubernetes manifests
-kubectl apply -f k8s/configmap.yml
-kubectl apply -f k8s/deployment.yml
-kubectl apply -f k8s/service.yml
-kubectl apply -f k8s/hpa.yml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+kubectl apply -f k8s/hpa.yaml
 
 # Check rollout and resources
 kubectl -n homelab rollout status deployment/homelab-api
-kubectl -n homelab get deploy,pods,svc,hpa
+kubectl -n homelab get deploy,pods,svc,ingress,hpa
+
+# Verify ingress controller status
+kubectl -n ingress-nginx get deploy,svc,pods
 
 # Verify app endpoints through Kind port mapping
 curl http://localhost:8080/health
@@ -391,7 +406,7 @@ curl http://localhost:8080/metrics
 
 - `kubectl get hpa` may show `cpu: <unknown>/60%` in Kind until metrics-server is installed.
 - With the current setup, application traffic path is:
-  `localhost:8080 -> kind control-plane:30080 -> Service:80 -> Pod:8080`
+  `localhost:8080 -> kind control-plane:30080 -> ingress-nginx -> Service:80 -> Pod:8080`
 
 #### Build context optimization
 
@@ -432,7 +447,7 @@ This controls networking, IAM wiring context, ECR repository names, and EKS clus
 ## 🛡️ Security & CI/CD
 
 ### Custom Policies
-- **Checkov Policy**: `policies/tagging_policy.yml` enforces Owner tags on S3 buckets.
+- **Checkov Policy**: `policies/tagging_policy.yaml` enforces Owner tags on S3 buckets.
 
 ### GitHub Actions Workflows
 - **Security Scan**: Runs Checkov on pushes/PRs to main, using custom policies.

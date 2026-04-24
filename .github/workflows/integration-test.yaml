@@ -33,8 +33,8 @@ jobs:
       
       - name: Apply namespace and ConfigMap
         run: |
-          kubectl apply -f k8s/namespace.yml --context kind-integration
-          kubectl apply -f k8s/configmap.yml --context kind-integration
+          kubectl apply -f k8s/namespace.yaml --context kind-integration
+          kubectl apply -f k8s/configmap.yaml --context kind-integration
       
       # Deployment manifest references ghcr-pull-secret - create a placeholder
       # so the pod spec is valid even though no pull will happen.
@@ -50,8 +50,8 @@ jobs:
       
       - name: Apply Deployment and Service
         run: |
-          kubectl apply -f k8s/deployment.yml --context kind-integration
-          kubectl apply -f k8s/service.yml --context kind-integration
+          kubectl apply -f k8s/deployment.yaml --context kind-integration
+          kubectl apply -f k8s/service.yaml --context kind-integration
 
       # Override the pinned GHCR image and disable remote pull -
       # the image was loaded into the node above.

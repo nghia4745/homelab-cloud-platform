@@ -13,6 +13,6 @@ spec:
   # Expose service port 80 and forward to container port 8080.
   - port: 80
     targetPort: 8080
-    # Must match kind extraPortMappings containerPort in kind/cluster.yml.
+    # Must match kind extraPortMappings containerPort in kind/cluster.yaml.
     protocol: TCP
 
