@@ -294,7 +294,7 @@ The `.github/workflows/build-and-push.yaml` workflow automates this process:
 - **Runs on**: Self-hosted runner (requires Docker and Buildx available locally)
 - **On PR (same repository)**: Builds image and runs Trivy vulnerability scan (no push)
 - **On PR from forks**: Job is skipped by guardrail to avoid restricted-token permission failures
-- **On push to main/dev**: Builds image, scans with Trivy, pushes both `sha-<short-commit>` and `latest` tags to GHCR
+- **On push to main**: Builds image, scans with Trivy, pushes both `sha-<short-commit>` and `latest` tags to GHCR
 
 The workflow:
 - Uses `docker/setup-buildx-action` for multi-stage build caching
@@ -319,11 +319,11 @@ Also ensure your repository has workflow permissions enabled:
 - Repository → Settings → Actions → General
 - Set **Workflow permissions** to `Read and write permissions`
 
-To trigger a push, commit and push to main or dev branch:
+To trigger a push, commit and push to main branch:
 ```bash
 git add .
 git commit -m "Phase 3: Containerization and GHCR push"
-git push origin dev
+git push origin main
 ```
 
 The workflow will automatically build, scan, and push to GHCR.
@@ -401,6 +401,21 @@ curl http://localhost:8080/metrics
 - `kubectl get hpa` may show `cpu: <unknown>/60%` in Kind until metrics-server is installed.
 - With the current setup, application traffic path is:
   `localhost:8080 -> kind control-plane:30080 -> ingress-nginx -> Service:80 -> Pod:8080`
+
+### Pause and Resume Scripts (Kind)
+
+When you want to pause and resume quickly, use these helpers:
+
+```bash
+# Full cleanup (uninstall Helm releases + delete kind cluster)
+./scripts/kind-full-cleanup.sh
+
+# Full setup (cluster + ingress + namespaces + networkpolicy + app release)
+export GHCR_USERNAME=<github-username>
+export GHCR_TOKEN=<github-read:packages-token>
+export GHCR_EMAIL=<email>
+./scripts/kind-full-setup.sh
+```
 
 #### Build context optimization
 
@@ -581,6 +596,8 @@ This controls networking, IAM wiring context, ECR repository names, and EKS clus
 - **Checkov Policy**: `policies/tagging_policy.yaml` enforces Owner tags on S3 buckets.
 
 ### GitHub Actions Workflows
+- **Build and Push**: Builds container image, scans with Trivy, and pushes to GHCR on pushes to main; validates image on PRs without pushing.
+- **Integration Test**: Creates ephemeral Kind cluster and deploys via Helm on PR events (main/dev branches) to validate Kubernetes integration before merge.
 - **Security Scan**: Runs Checkov on pushes/PRs to main, using custom policies.
 - **Infracost Estimate**: Calculates cost diffs on PRs and posts comments.
 - **Drift Detection**: Hourly Terraform plan checks for infrastructure drift.
