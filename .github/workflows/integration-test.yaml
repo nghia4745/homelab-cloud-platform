@@ -112,4 +112,9 @@ jobs:
       
       - name: Switch back to kind-homelab context
         if: always()
-        run: kubectl config use-context kind-homelab
+        run: |
+          if kubectl config get-contexts -o name | grep -Fxq kind-homelab; then
+            kubectl config use-context kind-homelab
+          else
+            echo "kind-homelab context not found; skipping context switch"
+          fi
