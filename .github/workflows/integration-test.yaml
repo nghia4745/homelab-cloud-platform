@@ -23,6 +23,10 @@ jobs:
       - name: Build test image
         run: docker build -t homelab-api:test .
       
+      # Remove any stale cluster left by a previous run on the self-hosted runner.
+      - name: Delete existing Kind integration cluster
+        run: kind delete cluster --name integration || true
+      
       # Isolated cluster so never conflicts with the dev cluster.
       - name: Create Kind integration cluster
         run: kind create cluster --name integration --wait 60s
