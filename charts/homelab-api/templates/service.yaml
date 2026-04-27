@@ -1,0 +1,35 @@
+# Service: Internal Cluster Load Balancer
+# ========================================
+# Helm template for a Kubernetes Service exposing the Deployment.
+# 
+# Service Type: ClusterIP (default)
+#   - Only accessible within the cluster
+#   - No external IP assigned
+#   - Used by Ingress controller to route traffic to pods
+#   - Provides stable DNS name: homelab-api.app.svc.cluster.local
+#   - Automatically load-balances traffic across pod replicas
+#
+# Traffic Flow:
+#   Ingress Controller -> Service (port 80) -> Pods (port 8080)
+#
+# Service Discovery in Kubernetes:
+#   Any pod can reach this service by hostname "homelab-api" within same namespace,
+#   or "homelab-api.app" from other namespaces, or fully qualified
+#   "homelab-api.app.svc.cluster.local" from anywhere.
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "homelab-api.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "homelab-api.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "homelab-api.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.containerPort }}
+      protocol: TCP

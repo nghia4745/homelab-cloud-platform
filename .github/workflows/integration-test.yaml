@@ -31,54 +31,63 @@ jobs:
       - name: Load test image into Kind
         run: kind load docker-image homelab-api:test --name integration
       
-      - name: Apply namespace and ConfigMap
+      - name: Apply test namespace
         run: |
-          kubectl apply -f k8s/namespace.yaml --context kind-integration
-          kubectl apply -f k8s/configmap.yaml --context kind-integration
-      
-      # Deployment manifest references ghcr-pull-secret - create a placeholder
-      # so the pod spec is valid even though no pull will happen.
+          kubectl apply -f k8s/namespaces/app.yaml --context kind-integration
+
+      # Helm values expect an image pull secret. For integration tests we use a
+      # placeholder secret and local image loaded into Kind.
       - name: Create placeholder pull secret
         run: |
           kubectl create secret docker-registry ghcr-pull-secret \
-            --namespace homelab \
+            --namespace app \
             --docker-server=ghcr.io \
             --docker-username=placeholder \
             --docker-password=placeholder \
-            --namespace homelab \
-            --context kind-integration
-      
-      - name: Apply Deployment and Service
-        run: |
-          kubectl apply -f k8s/deployment.yaml --context kind-integration
-          kubectl apply -f k8s/service.yaml --context kind-integration
+            --dry-run=client -o yaml | kubectl apply --context kind-integration -f -
 
-      # Override the pinned GHCR image and disable remote pull -
-      # the image was loaded into the node above.
-      - name: Patch deployment to use local test image
+      - name: Install app via Helm
         run: |
-          kubectl set image deployment/homelab-api \
-            homelab-api=homelab-api:test \
-            --namespace homelab \
-            --context kind-integration
-          kubectl patch deployment/homelab-api \
-            --namespace homelab \
-            --context kind-integration \
-            --type='json' \
-            --patch='[{"op": "remove", "path": "/spec/template/spec/imagePullSecrets"}]'
+          helm upgrade --install homelab-api-app charts/homelab-api \
+            --kube-context kind-integration \
+            --namespace app \
+            --values charts/homelab-api/values-dev.yaml \
+            --set image.repository=homelab-api \
+            --set image.tag=test \
+            --set image.pullPolicy=IfNotPresent \
+            --set ingress.enabled=false \
+            --set hpa.enabled=false
       
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/homelab-api \
-            --namespace homelab \
+          kubectl rollout status deployment/homelab-api-app \
+            --namespace app \
             --context kind-integration \
             --timeout=120s
+
+      - name: Verify Helm release and list resources
+        run: |
+          helm list --kube-context kind-integration --namespace app
+          helm status homelab-api-app --kube-context kind-integration --namespace app
+          release_status=$(helm status homelab-api-app --kube-context kind-integration --namespace app | awk -F': ' '/^STATUS:/ {print $2}')
+          echo "Detected Helm release status: ${release_status}"
+          if [ "${release_status}" != "deployed" ]; then
+            echo "Expected Helm release status to be deployed, got: ${release_status}"
+            exit 1
+          fi
+          kubectl get deploy,pods,svc,ingress,hpa \
+            --namespace app \
+            --context kind-integration
+          kubectl get events \
+            --namespace app \
+            --context kind-integration \
+            --sort-by=.lastTimestamp | tail -n 20
         
       # Port 18080 avoids collision with the dev cluster on 8080.
       - name: Validate endpoints
         run: |
-          kubectl port-forward service/homelab-api 18080:80 \
-            --namespace homelab \
+          kubectl port-forward service/homelab-api-app 18080:80 \
+            --namespace app \
             --context kind-integration &
             sleep 3
 

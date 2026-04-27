@@ -1,0 +1,56 @@
+# Deployment: Desired Pod State for homelab-api
+# =============================================
+# A Deployment keeps a declared number of identical pods running.
+#
+# Learning points:
+# - replicas controls steady-state pod count when HPA is not scaling.
+# - imagePullSecrets lets the cluster pull private images from GHCR.
+# - envFrom injects ConfigMap values as environment variables.
+# - readinessProbe gates traffic until the container is ready.
+# - livenessProbe restarts unhealthy containers automatically.
+# - resources defines scheduler requests and hard runtime limits.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "homelab-api.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "homelab-api.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "homelab-api.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "homelab-api.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- if .Values.imagePullSecret.enabled }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret.name }}
+      {{- end }}
+      containers:
+      - name: homelab-api
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        envFrom:
+          - configMapRef:
+              name: {{ include "homelab-api.fullname" . }}-config
+        resources: {{- toYaml .Values.resources | nindent 12 }}
+        ports:
+        - containerPort: {{ .Values.containerPort }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.containerPort }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.containerPort }}
+          initialDelaySeconds: 10
+          periodSeconds: 30

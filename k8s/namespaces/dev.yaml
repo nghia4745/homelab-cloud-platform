@@ -1,0 +1,10 @@
+# Namespace: dev
+# Purpose: Reserved for future development/staging workloads.
+# In a full CD pipeline, this namespace would run unstable or candidate releases
+# before production promotion. For now, it remains empty.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+  labels:
+    environment: dev

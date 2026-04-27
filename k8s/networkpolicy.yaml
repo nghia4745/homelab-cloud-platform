@@ -1,0 +1,56 @@
+# NetworkPolicy: Zero-Trust Traffic Control for homelab-api
+# Purpose: Enforce explicit allow-rules for pod-to-pod communication.
+# 
+# **Key Concept: Default-Deny Model**
+# Without NetworkPolicy: all pods can talk to all pods (default allow)
+# With NetworkPolicy: pods cannot communicate unless explicitly allowed
+#
+# This policy allows:
+# 1. **Ingress**: Traffic FROM ingress-nginx namespace → homelab-api pods
+#    - HTTP requests from nginx controller reach the app
+# 2. **Egress**: Traffic FROM homelab-api pods → kube-system namespace on port 53
+#    - DNS queries to resolve service names (required for pod startup)
+#
+# **What is blocked**: 
+# - Pods from default, dev, monitoring namespaces cannot reach homelab-api
+# - Egress to databases, external APIs, internet (unless added to policy)
+# - Pod-to-pod traffic to other namespaces
+#
+# **Note**: Kind's default CNI may not enforce these rules, but the policy
+# is valid Kubernetes and will enforce on production CNIs (Calico, Cilium, etc).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: homelab-api-allow-ingress-nginx
+  namespace: app
+spec:
+  # Target these pods in the app namespace
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: homelab-api
+      app.kubernetes.io/instance: homelab-api-app
+  
+  # This policy controls both Ingress AND Egress
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  # Allow inbound traffic from ingress-nginx controller only
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+  
+  # Allow outbound traffic to kube-system for DNS resolution
+  # (required for pod to resolve service names like "prometheus" in monitoring namespace)
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53  # DNS
+        - protocol: TCP
+          port: 53  # DNS

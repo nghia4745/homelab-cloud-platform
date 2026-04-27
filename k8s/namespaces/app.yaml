@@ -1,0 +1,14 @@
+# Namespace: app
+# Purpose: Isolate application workloads (homelab-api Flask service).
+# Kubernetes namespaces are lightweight isolation boundaries that:
+#   - Separate resources into logical groups
+#   - Enable role-based access control (RBAC) per namespace
+#   - Provide quota and resource limits boundaries
+#   - Make NetworkPolicies enforceable per namespace
+# This namespace holds the Helm-managed homelab-api release.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app
+  labels:
+    workload-type: application

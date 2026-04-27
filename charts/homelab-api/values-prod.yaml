@@ -1,0 +1,42 @@
+# Helm Values: Production Environment
+# ===================================
+#
+# This values file is optimized for **stable, high-availability deployment**:
+#   - Higher replicas (3 minimum) for load distribution
+#   - More restrictive resource requests/limits to prevent resource starvation
+#   - Reduced logging verbosity to save I/O and storage
+#   - Stricter autoscale thresholds (only scale under real pressure)
+#   - Higher CPU/memory limits to handle production traffic spikes
+#
+# **Best Practice**: Prod values should NEVER be used for local testing.
+# This prevents accidental production misconfiguration.
+#
+# Usage (dry-run validation):
+#   helm template homelab-api-app charts/homelab-api -n app -f charts/homelab-api/values-prod.yaml
+#
+# Usage (actual prod deployment):
+#   helm install homelab-api-app charts/homelab-api -n app -f charts/homelab-api/values-prod.yaml
+#
+
+replicaCount: 3
+
+config:
+  appEnv: prod
+  logLevel: warning
+
+image:
+  pullPolicy: IfNotPresent
+
+hpa:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 50
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

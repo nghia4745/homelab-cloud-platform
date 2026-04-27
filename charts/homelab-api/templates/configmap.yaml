@@ -1,0 +1,25 @@
+# ConfigMap: Application Runtime Configuration
+# ===============================================
+# Helm template for externalizing app environment variables.
+# 
+# Benefits of ConfigMap:
+#   - Separates configuration from image (12-factor app principle)
+#   - Allows redeployment of same image with different configs
+#   - Enables easy switching between dev/prod via different values files
+#   - Changes can be rolled back without rebuilding containers
+#
+# This ConfigMap is referenced by the Deployment via envFrom,
+# injecting these variables as container environment variables.
+#
+# Rendered example (dev):
+#   APP_ENV: "dev"
+#   LOG_LEVEL: "info"
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "homelab-api.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+data:
+  APP_ENV: {{ .Values.config.appEnv | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
