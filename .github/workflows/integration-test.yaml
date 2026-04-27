@@ -21,6 +21,10 @@ jobs:
       - name: Build test image
         run: docker build -t homelab-api:test .
       
+      # Remove any stale cluster left by a previous run on the self-hosted runner.
+      - name: Delete existing Kind integration cluster
+        run: kind delete cluster --name integration || true
+      
       # Isolated cluster so never conflicts with the dev cluster.
       - name: Create Kind integration cluster
         run: kind create cluster --name integration --wait 60s
@@ -106,4 +110,9 @@ jobs:
       
       - name: Switch back to kind-homelab context
         if: always()
-        run: kubectl config use-context kind-homelab
+        run: |
+          if kubectl config get-contexts -o name | grep -Fxq kind-homelab; then
+            kubectl config use-context kind-homelab
+          else
+            echo "kind-homelab context not found; skipping context switch"
+          fi

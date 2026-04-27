@@ -6,16 +6,18 @@
 #   - Only accessible within the cluster
 #   - No external IP assigned
 #   - Used by Ingress controller to route traffic to pods
-#   - Provides stable DNS name: homelab-api.app.svc.cluster.local
+#   - Provides stable DNS name: <fullname>.<namespace>.svc.cluster.local
+#     (where <fullname> is derived from the Helm release name, e.g. "homelab-api-app")
 #   - Automatically load-balances traffic across pod replicas
 #
 # Traffic Flow:
 #   Ingress Controller -> Service (port 80) -> Pods (port 8080)
 #
 # Service Discovery in Kubernetes:
-#   Any pod can reach this service by hostname "homelab-api" within same namespace,
-#   or "homelab-api.app" from other namespaces, or fully qualified
-#   "homelab-api.app.svc.cluster.local" from anywhere.
+#   Any pod can reach this service by the rendered Service name within the same namespace,
+#   or "<fullname>.<namespace>" from other namespaces, or fully qualified
+#   "<fullname>.<namespace>.svc.cluster.local" from anywhere.
+#   The actual Service name is set by {{ include "homelab-api.fullname" . }}.
 #
 apiVersion: v1
 kind: Service

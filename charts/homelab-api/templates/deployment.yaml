@@ -33,24 +33,24 @@ spec:
         - name: {{ .Values.imagePullSecret.name }}
       {{- end }}
       containers:
-      - name: homelab-api
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
-        envFrom:
-          - configMapRef:
-              name: {{ include "homelab-api.fullname" . }}-config
-        resources: {{- toYaml .Values.resources | nindent 12 }}
-        ports:
-        - containerPort: {{ .Values.containerPort }}
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: {{ .Values.containerPort }}
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: {{ .Values.containerPort }}
-          initialDelaySeconds: 10
-          periodSeconds: 30
+        - name: homelab-api
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "homelab-api.fullname" . }}-config
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.containerPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.containerPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 30
