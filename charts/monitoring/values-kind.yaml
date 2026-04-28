@@ -1,0 +1,132 @@
+# kube-prometheus-stack — Kind-tuned values
+# ==========================================
+# kube-prometheus-stack is an umbrella Helm chart that bundles:
+#
+#   Component              Role
+#   ─────────────────────  ───────────────────────────────────────────────
+#   Prometheus Operator    Watches ServiceMonitor CRDs; configures scrapes
+#   Prometheus             Scrapes, stores, and queries time-series metrics
+#   Grafana                Dashboards and visualization
+#   Alertmanager           Routes firing alerts (email, Slack, PagerDuty…)
+#   kube-state-metrics     Emits metrics about Kubernetes objects
+#   node-exporter          Emits host-level metrics from every Kind node
+#
+# Kind clusters run on your laptop with limited RAM/CPU, so this file:
+#   - Trims resource requests to what Kind can handle
+#   - Shrinks Prometheus retention/storage to 1 day / 2 Gi
+#   - Disables prometheus-adapter (HPA uses metrics-server in Kind instead)
+#   - Exposes Grafana via kubectl port-forward, no Ingress needed
+# ─────────────────────────────────────────────────────────
+# Prometheus
+# ─────────────────────────────────────────────────────────
+prometheus:
+  prometheusSpec:
+    # Keep metrics for 1 day locally.
+    # Production typically uses 15d-1y with remote storage (Thanos, Cortex).
+    retention: 1d
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+        
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    # By default the Operator only picks up ServiceMonitors that match the
+    # release's own label selector. Setting both to false makes Prometheus
+    # watch ALL ServiceMonitors in ALL namespaces — the simplest option for
+    # a single-team homelab.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+# ─────────────────────────────────────────────────────────
+# Grafana
+# ─────────────────────────────────────────────────────────
+# Access locally with:
+#   kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+# Then open http://localhost:3000  (admin / admin)
+grafana:
+  # ⚠️  Change this before exposing Grafana outside localhost.
+  adminPassword: admin
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+
+  # ── Dashboard sidecar ──────────────────────────────────
+  # The sidecar watches for ConfigMaps labelled grafana_dashboard: "1"
+  # in any namespace and auto-loads them as dashboards.
+  # This lets you ship a dashboard alongside your workload chart
+  # without touching the Grafana config directly.
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+# ─────────────────────────────────────────────────────────
+# Alertmanager
+# ─────────────────────────────────────────────────────────
+# Alertmanager groups, deduplicates, and routes alerts.
+# For Phase 6 we keep it running, but leave routing at defaults
+# so alerts are visible in the UI without sending notifications yet.
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+# ─────────────────────────────────────────────────────────
+# kube-state-metrics
+# ─────────────────────────────────────────────────────────
+# Exposes metrics about Kubernetes objects:
+#   kube_deployment_replicas
+#   kube_pod_status_phase
+#   kube_hpa_status_current_replicas
+# These are useful for dashboards and alerts about desired vs actual state.
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# ─────────────────────────────────────────────────────────
+# node-exporter
+# ─────────────────────────────────────────────────────────
+# Runs as a DaemonSet and exports node-level metrics:
+#   CPU usage, memory, filesystem, network, load average
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# ─────────────────────────────────────────────────────────
+# prometheus-adapter (disabled)
+# ─────────────────────────────────────────────────────────
+# prometheus-adapter exposes Prometheus queries to the Kubernetes
+# Custom Metrics API so HPA can scale on app-level signals like request rate.
+# We are not doing custom-metric autoscaling yet, so disable it to save resources.
+prometheus-adapter:
+  enabled: false

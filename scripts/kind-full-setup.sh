@@ -5,6 +5,9 @@ CLUSTER_NAME="homelab"
 CLUSTER_CONFIG="kind/cluster.yaml"
 APP_RELEASE="homelab-api-app"
 APP_NAMESPACE="app"
+MONITORING_RELEASE="kube-prometheus-stack"
+MONITORING_NAMESPACE="monitoring"
+MONITORING_VALUES="charts/monitoring/values-kind.yaml"
 INGRESS_RELEASE="ingress-nginx"
 INGRESS_NAMESPACE="ingress-nginx"
 
@@ -28,6 +31,11 @@ if [[ ! -f "${CLUSTER_CONFIG}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${MONITORING_VALUES}" ]]; then
+  echo "Error: monitoring values file not found at ${MONITORING_VALUES}."
+  exit 1
+fi
+
 if ! kind get clusters 2>/dev/null | grep -qx "${CLUSTER_NAME}"; then
   echo "Creating Kind cluster '${CLUSTER_NAME}'..."
   kind create cluster --config "${CLUSTER_CONFIG}"
@@ -40,6 +48,8 @@ kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
 
 echo "Adding/updating ingress-nginx Helm repo..."
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
+echo "Adding/updating prometheus-community Helm repo..."
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
 helm repo update >/dev/null
 
 echo "Installing/upgrading ingress-nginx controller..."
@@ -60,6 +70,23 @@ kubectl apply -f k8s/namespaces/app.yaml --context "kind-${CLUSTER_NAME}"
 kubectl apply -f k8s/namespaces/dev.yaml --context "kind-${CLUSTER_NAME}"
 kubectl apply -f k8s/namespaces/monitoring.yaml --context "kind-${CLUSTER_NAME}"
 kubectl apply -f k8s/networkpolicy.yaml --context "kind-${CLUSTER_NAME}"
+
+echo "Installing/upgrading monitoring stack..."
+helm upgrade --install "${MONITORING_RELEASE}" prometheus-community/kube-prometheus-stack \
+  --kube-context "kind-${CLUSTER_NAME}" \
+  --namespace "${MONITORING_NAMESPACE}" \
+  --create-namespace \
+  --values "${MONITORING_VALUES}"
+
+kubectl rollout status deployment/${MONITORING_RELEASE}-operator \
+  -n "${MONITORING_NAMESPACE}" \
+  --context "kind-${CLUSTER_NAME}" \
+  --timeout=180s
+
+kubectl rollout status deployment/${MONITORING_RELEASE}-grafana \
+  -n "${MONITORING_NAMESPACE}" \
+  --context "kind-${CLUSTER_NAME}" \
+  --timeout=180s
 
 if [[ -z "${GHCR_USERNAME:-}" || -z "${GHCR_TOKEN:-}" ]]; then
   echo "Error: GHCR_USERNAME and GHCR_TOKEN must be set to create ghcr-pull-secret."
@@ -82,11 +109,15 @@ echo "Installing/upgrading app Helm release..."
 helm upgrade --install "${APP_RELEASE}" charts/homelab-api \
   --kube-context "kind-${CLUSTER_NAME}" \
   --namespace "${APP_NAMESPACE}" \
-  --values charts/homelab-api/values-dev.yaml
+  --values charts/homelab-api/values-dev.yaml \
+  --set serviceMonitor.enabled=true \
+  --set grafanaDashboard.enabled=true
 
 kubectl rollout status deployment/${APP_RELEASE} \
   -n "${APP_NAMESPACE}" \
   --context "kind-${CLUSTER_NAME}" \
   --timeout=180s
 
-echo "Setup complete. Verify endpoint: curl http://localhost:8080/health"
+echo "Setup complete."
+echo "Verify app endpoint: curl http://localhost:8080/health"
+echo "Access Grafana: kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 13000:80"

@@ -28,6 +28,21 @@ service:
   type: ClusterIP
   port: 80
 
+serviceMonitor:
+  enabled: false
+  namespace: monitoring
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+  labels:
+    release: kube-prometheus-stack
+
+grafanaDashboard:
+  enabled: false
+  name: homelab-api-overview
+  labels:
+    grafana_dashboard: "1"
+
 ingress:
   enabled: true
   className: nginx

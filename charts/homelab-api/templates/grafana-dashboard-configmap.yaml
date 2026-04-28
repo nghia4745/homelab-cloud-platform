@@ -1,0 +1,67 @@
+# Grafana Dashboard ConfigMap
+# ===========================
+# This optional ConfigMap is discovered by Grafana's dashboard sidecar when
+# label grafana_dashboard: "1" is present. It keeps dashboard JSON versioned
+# with the application chart.
+{{- if .Values.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "homelab-api.fullname" . }}-grafana-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "homelab-api.labels" . | nindent 4 }}
+    {{- with .Values.grafanaDashboard.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+data:
+  homelab-api-overview.json: |
+    {
+      "title": "Homelab API Overview",
+      "uid": "{{ .Values.grafanaDashboard.name }}",
+      "schemaVersion": 39,
+      "version": 1,
+      "timezone": "browser",
+      "refresh": "10s",
+      "time": {
+        "from": "now-15m",
+        "to": "now"
+      },
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Requests Per Second (5m)",
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "targets": [
+            {
+              "expr": "sum by (endpoint) (rate(app_requests_total[5m]))",
+              "legendFormat": "{{ "{{" }} endpoint {{ "}}" }}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Total Requests",
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 9
+          },
+          "targets": [
+            {
+              "expr": "sum by (endpoint) (app_requests_total)",
+              "legendFormat": "{{ "{{" }} endpoint {{ "}}" }}",
+              "refId": "B"
+            }
+          ]
+        }
+      ]
+    }
+{{- end }}

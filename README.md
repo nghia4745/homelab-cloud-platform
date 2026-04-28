@@ -45,8 +45,8 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 ├── app/                           # Phase 3 sample Flask API
 │   ├── main.py                    # /health, /api/greeting, /metrics endpoints
 │   └── requirements.txt           # Python runtime dependencies
-├── charts/                        # Phase 5: Helm chart for templated deployments
-│   └── homelab-api/               # Main application chart
+├── charts/                        # Phase 5/6 Helm charts for app + observability
+│   ├── homelab-api/               # Main application chart
 │       ├── Chart.yaml             # Chart metadata and versioning
 │       ├── values.yaml            # Base default values
 │       ├── values-dev.yaml        # Development environment overrides (2 replicas, info logging)
@@ -55,9 +55,13 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │       └── templates/             # Kubernetes manifest templates
 │           ├── configmap.yaml     # ConfigMap template with APP_ENV, LOG_LEVEL
 │           ├── deployment.yaml    # Deployment template with probes, resources, image pull
+│           ├── servicemonitor.yaml # Prometheus Operator scrape target for /metrics
+│           ├── grafana-dashboard-configmap.yaml # Auto-provisioned dashboard config
 │           ├── service.yaml       # Service template (ClusterIP for Ingress backend)
 │           ├── ingress.yaml       # Ingress template for HTTP routing
 │           └── hpa.yaml           # HorizontalPodAutoscaler template for auto-scaling
+│   └── monitoring/
+│       └── values-kind.yaml       # Kind-tuned kube-prometheus-stack values
 ├── kind/
 │   └── cluster.yaml               # Kind cluster definition and local port mapping
 ├── k8s/
@@ -343,7 +347,7 @@ Phase 4 established the core Kubernetes architecture on Kind (Pods, Service, Ing
 - `k8s/namespaces/app.yaml`
   - Creates the active application namespace
 - `ingress-nginx` controller (installed via Helm)
-  - Terminates incoming HTTP and forwards traffic to Service `homelab-api`
+  - Terminates incoming HTTP and forwards traffic to Service `homelab-api-app`
 - `.github/workflows/integration-test.yaml`
   - Creates ephemeral Kind cluster in CI
   - Deploys Helm release and validates `/health`, `/api/greeting`, and `/metrics`
@@ -407,10 +411,10 @@ curl http://localhost:8080/metrics
 When you want to pause and resume quickly, use these helpers:
 
 ```bash
-# Full cleanup (uninstall Helm releases + delete kind cluster)
+# Full cleanup (uninstall app + monitoring + ingress releases, then delete kind cluster)
 ./scripts/kind-full-cleanup.sh
 
-# Full setup (cluster + ingress + namespaces + networkpolicy + app release)
+# Full setup (cluster + ingress + monitoring + namespaces + policy + app release)
 export GHCR_USERNAME=<github-username>
 export GHCR_TOKEN=<github-read:packages-token>
 export GHCR_EMAIL=<email>
@@ -462,7 +466,9 @@ Building on the foundational Kubernetes skills from Phase 4, Phase 5 introduces 
 
 **NetworkPolicy** (`k8s/networkpolicy.yaml`)
 - Zero-trust networking model: Deny all traffic by default, allow explicit rules only
-- **Ingress rule**: Allows traffic from `ingress-nginx` namespace only (HTTP from controller)
+- **Ingress rules**:
+  - Allows traffic from `ingress-nginx` namespace (HTTP from controller)
+  - Allows traffic from `monitoring` namespace (Prometheus scrape traffic to `/metrics`)
 - **Egress rule**: Allows DNS queries to `kube-system:53` only (service discovery)
 - Blocks: Pod-to-pod communication outside rules, internet egress, cross-namespace traffic
 - Learning impact: Enforces least-privilege networking, prevents lateral movement
@@ -514,7 +520,7 @@ helm list -n app
 helm template homelab-api charts/homelab-api -f charts/homelab-api/values-dev.yaml
 
 # Check rollout and resources
-kubectl -n app rollout status deployment/homelab-api
+kubectl -n app rollout status deployment/homelab-api-app
 kubectl -n app get deploy,pods,svc,ingress,hpa
 
 # Verify app endpoints through Kind port mapping
@@ -574,6 +580,80 @@ Raw Kubernetes manifests from Phase 4 are now removed, and the Helm chart is the
 - Use `helm lint` to validate chart syntax before deployment
 - Use `helm template` to inspect rendered YAML without applying
 - Values files are version-controlled; secrets should use external tools (Sealed Secrets, External Secrets, Vault)
+
+## 📈 Phase 6: Observability (Prometheus + Grafana + Alertmanager)
+
+Phase 6 adds a full monitoring stack in namespace `monitoring` and connects `homelab-api` metrics into Prometheus and Grafana.
+
+### What was added
+
+- `charts/monitoring/values-kind.yaml`
+  - Kind-tuned values for `kube-prometheus-stack` (Prometheus Operator, Prometheus, Grafana, Alertmanager)
+  - Lower local resource settings and 1-day retention for laptop clusters
+- `charts/homelab-api/templates/servicemonitor.yaml`
+  - Creates a ServiceMonitor in `monitoring` namespace
+  - Prometheus scrapes app service endpoint `/metrics`
+- `charts/homelab-api/templates/grafana-dashboard-configmap.yaml`
+  - Provisions a basic dashboard for request totals/rate from `app_requests_total`
+  - Grafana sidecar auto-discovers via label `grafana_dashboard: "1"`
+- `k8s/networkpolicy.yaml`
+  - Allows ingress from `monitoring` namespace to app pods for scrape traffic
+
+### Install/upgrade monitoring stack
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --create-namespace \
+  --values charts/monitoring/values-kind.yaml
+```
+
+### Enable app observability hooks
+
+```bash
+helm upgrade --install homelab-api-app charts/homelab-api \
+  --namespace app \
+  --values charts/homelab-api/values-dev.yaml \
+  --set serviceMonitor.enabled=true \
+  --set grafanaDashboard.enabled=true
+```
+
+### Verify targets and dashboards
+
+```bash
+# Check ServiceMonitor exists
+kubectl -n monitoring get servicemonitor homelab-api-app
+
+# Check Prometheus target UI
+kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 19090:9090
+# Open: http://localhost:19090/targets
+
+# Access Grafana
+kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 13000:80
+# Open: http://localhost:13000
+```
+
+Grafana Explore queries:
+
+```promql
+app_requests_total
+sum by (endpoint) (app_requests_total)
+sum by (endpoint) (rate(app_requests_total[5m]))
+```
+
+### Troubleshooting notes
+
+- If `port-forward` fails with `address already in use`, free the local port:
+
+```bash
+lsof -tiTCP:13000 -sTCP:LISTEN | xargs kill -9
+```
+
+- If Grafana restarts with `OOMKilled`, increase `grafana.resources.limits.memory` in `charts/monitoring/values-kind.yaml` and re-run Helm upgrade.
+- It is normal in Kind for some control-plane scrape targets (scheduler/controller-manager/proxy) to show `down`; app targets can still be `up`.
 
 ## 🔐 Configuration
 

@@ -32,6 +32,7 @@ spec:
     app.kubernetes.io/name: {{ include "homelab-api.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
-    - port: {{ .Values.service.port }}
+    - name: http
+      port: {{ .Values.service.port }}
       targetPort: {{ .Values.containerPort }}
       protocol: TCP
