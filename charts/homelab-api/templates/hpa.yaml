@@ -1,0 +1,37 @@
+# HorizontalPodAutoscaler: Dynamic Scaling based on Metrics
+# ==========================================================
+# This resource scales pods up/down based on average CPU utilization.
+#
+# Conditional behavior:
+# - The HPA block renders only when values.hpa.enabled is true.
+# - This lets you disable autoscaling for debugging fixed replica counts.
+#
+# Scaling model:
+# - If average CPU is above target, Kubernetes increases replicas.
+# - If average CPU is below target, Kubernetes decreases replicas.
+# - minReplicas and maxReplicas are hard safety bounds.
+#
+# Note: HPA depends on metrics-server. Without it, CPU targets can show
+# as unknown in `kubectl get hpa`.
+{{ if .Values.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "homelab-api.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "homelab-api.fullname" . }}
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.targetCPUUtilizationPercentage }}
+{{ end }}
+

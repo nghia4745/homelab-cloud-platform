@@ -1,0 +1,16 @@
+# Namespace: monitoring
+# Purpose: Dedicated namespace for observability stack (Phase 6).
+# Will contain:
+#   - Prometheus (metrics collection and storage)
+#   - Grafana (visualization and dashboards)
+#   - Alertmanager (alert routing and notification)
+# Separating observability from app workloads follows best practices:
+#   - Isolates system load from user apps
+#   - Enables strict RBAC for metrics access
+#   - Simplifies disaster recovery and retention policies
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    monitoring: "true"

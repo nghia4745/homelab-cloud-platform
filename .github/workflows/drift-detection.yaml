@@ -25,7 +25,7 @@ jobs:
     steps:
       # Step 1: Checkout the repository code to access Terraform files.
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Step 2: Initialize local Vault stack backend/providers.
       - name: Terraform Init (local vault)

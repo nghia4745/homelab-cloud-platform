@@ -1,6 +1,5 @@
-```markdown
 # Terraform DevOps Learning Project
-![Security Scan](https://github.com/nghia4745/homelab-cloud-platform/actions/workflows/security-scan.yml/badge.svg)
+![Security Scan](https://github.com/nghia4745/homelab-cloud-platform/actions/workflows/security-scan.yaml/badge.svg)
 
 A hands-on Terraform project demonstrating infrastructure-as-code concepts with Docker, Vault secret management, AWS resources, custom security policies, and CI/CD automation.
 
@@ -36,22 +35,37 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │   ├── eks/                       # EKS control plane and managed node group
 │   └── s3/                        # Terraform state backend bucket and lock table
 ├── policies/                      # Custom Checkov security policies
-│   └── tagging_policy.yml         # Enforces Owner tag on S3 buckets
+│   └── tagging_policy.yaml        # Enforces Owner tag on S3 buckets
 ├── .github/workflows/             # GitHub Actions CI/CD workflows
-│   ├── security-scan.yml          # Runs Checkov security scans
-│   ├── infracost.yml              # Estimates infrastructure costs on PRs
-│   ├── drift-detection.yml        # Hourly drift detection via Terraform plan
-│   └── build-and-push.yml         # Builds, scans, and pushes container to GHCR
+│   ├── security-scan.yaml         # Runs Checkov security scans
+│   ├── infracost.yaml             # Estimates infrastructure costs on PRs
+│   ├── drift-detection.yaml       # Hourly drift detection via Terraform plan
+│   ├── build-and-push.yaml        # Builds, scans, and pushes container to GHCR
+│   └── integration-test.yaml      # Runs Kind-based Kubernetes integration tests
 ├── app/                           # Phase 3 sample Flask API
 │   ├── main.py                    # /health, /api/greeting, /metrics endpoints
 │   └── requirements.txt           # Python runtime dependencies
+├── charts/                        # Phase 5: Helm chart for templated deployments
+│   └── homelab-api/               # Main application chart
+│       ├── Chart.yaml             # Chart metadata and versioning
+│       ├── values.yaml            # Base default values
+│       ├── values-dev.yaml        # Development environment overrides (2 replicas, info logging)
+│       ├── values-prod.yaml       # Production environment overrides (3+ replicas, warning logging)
+│       ├── _helpers.tpl           # Named templates for reusable Helm functions
+│       └── templates/             # Kubernetes manifest templates
+│           ├── configmap.yaml     # ConfigMap template with APP_ENV, LOG_LEVEL
+│           ├── deployment.yaml    # Deployment template with probes, resources, image pull
+│           ├── service.yaml       # Service template (ClusterIP for Ingress backend)
+│           ├── ingress.yaml       # Ingress template for HTTP routing
+│           └── hpa.yaml           # HorizontalPodAutoscaler template for auto-scaling
 ├── kind/
-│   └── cluster.yml                # Kind cluster definition and local port mapping
+│   └── cluster.yaml               # Kind cluster definition and local port mapping
 ├── k8s/
-│   ├── deployment.yml             # homelab-api Deployment (probes, resources, image pull)
-│   ├── service.yml                # NodePort Service exposing homelab-api
-│   ├── configmap.yml              # Runtime app configuration
-│   └── hpa.yml                    # Horizontal Pod Autoscaler for homelab-api
+│   ├── namespaces/                # Phase 5: Namespace definitions
+│   │   ├── app.yaml               # Workload namespace for homelab-api
+│   │   ├── dev.yaml               # Staging/development namespace
+│   │   └── monitoring.yaml        # Reserved for Phase 6 observability stack
+│   ├── networkpolicy.yaml         # Phase 5: Zero-trust network policies
 ├── Dockerfile                     # Multi-stage container build for app/
 ├── .dockerignore                  # Excludes unnecessary files from Docker build context
 ├── Makefile                       # Convenience targets for local stacks
@@ -275,12 +289,12 @@ curl http://localhost:8080/metrics
 
 #### Automated push via GitHub Actions
 
-The `.github/workflows/build-and-push.yml` workflow automates this process:
+The `.github/workflows/build-and-push.yaml` workflow automates this process:
 
 - **Runs on**: Self-hosted runner (requires Docker and Buildx available locally)
 - **On PR (same repository)**: Builds image and runs Trivy vulnerability scan (no push)
 - **On PR from forks**: Job is skipped by guardrail to avoid restricted-token permission failures
-- **On push to main/dev**: Builds image, scans with Trivy, pushes both `sha-<short-commit>` and `latest` tags to GHCR
+- **On push to main**: Builds image, scans with Trivy, pushes both `sha-<short-commit>` and `latest` tags to GHCR
 
 The workflow:
 - Uses `docker/setup-buildx-action` for multi-stage build caching
@@ -305,54 +319,47 @@ Also ensure your repository has workflow permissions enabled:
 - Repository → Settings → Actions → General
 - Set **Workflow permissions** to `Read and write permissions`
 
-To trigger a push, commit and push to main or dev branch:
+To trigger a push, commit and push to main branch:
 ```bash
 git add .
 git commit -m "Phase 3: Containerization and GHCR push"
-git push origin dev
+git push origin main
 ```
 
 The workflow will automatically build, scan, and push to GHCR.
 
 ## ☸️ Phase 4: Kubernetes Deployment on Kind
 
-The application is deployed to a local Kind cluster using private images from GHCR.
+Phase 4 established the core Kubernetes architecture on Kind (Pods, Service, Ingress, HPA, and CI validation). The original raw manifests were intentionally removed during Phase 5 cleanup, and deployment now continues via Helm templates.
 
 ### What was added
 
-- `kind/cluster.yml`
+- `kind/cluster.yaml`
   - Defines a two-node Kind cluster (`control-plane` + `worker`)
-  - Maps host port `8080` to Kubernetes NodePort `30080` for local access
-- `k8s/namespace.yml`
-  - Creates the `homelab` namespace
-- `k8s/deployment.yml`
-  - Runs `homelab-api` in namespace `homelab`
-  - Pulls private image via `ghcr-pull-secret`
-  - Uses health probes on `/health`
-  - Sets CPU and memory requests/limits
-  - Uses immutable image tag (`sha-...`) for reproducible deploys
-  - Loads runtime config from `ConfigMap`
-- `k8s/service.yml`
-  - Exposes Deployment as `NodePort` service
-  - Routes service port `80` to container port `8080`
-  - Uses fixed node port `30080` for stable local endpoint mapping
-- `k8s/configmap.yml`
-  - Externalized environment settings (`APP_ENV`, `LOG_LEVEL`)
-- `k8s/hpa.yml`
-  - Configures autoscaling from 2 to 5 replicas at 60% CPU target
+  - Maps host port `8080` to ingress-nginx NodePort `30080` for local access
+- `charts/homelab-api/templates/*`
+  - Replaces raw manifests with reusable Helm templates
+  - Keeps Deployment/Service/Ingress/HPA/ConfigMap in a single chart
+- `k8s/namespaces/app.yaml`
+  - Creates the active application namespace
+- `ingress-nginx` controller (installed via Helm)
+  - Terminates incoming HTTP and forwards traffic to Service `homelab-api`
+- `.github/workflows/integration-test.yaml`
+  - Creates ephemeral Kind cluster in CI
+  - Deploys Helm release and validates `/health`, `/api/greeting`, and `/metrics`
 
 ### Prerequisites
 
 **1. Create the Kind cluster**
 
 ```bash
-kind create cluster --config kind/cluster.yml
+kind create cluster --config kind/cluster.yaml
 ```
 
-**2. Create the `homelab` namespace**
+**2. Create the `app` namespace**
 
 ```bash
-kubectl apply -f k8s/namespace.yml
+kubectl apply -f k8s/namespaces/app.yaml
 ```
 
 **3. Create the GHCR pull secret**
@@ -361,7 +368,7 @@ Required to pull the private image from GHCR:
 
 ```bash
 kubectl create secret docker-registry ghcr-pull-secret \
-  --namespace homelab \
+  --namespace app \
   --docker-server=ghcr.io \
   --docker-username=<github-username> \
   --docker-password=<github-personal-access-token-with-read:packages> \
@@ -371,15 +378,17 @@ kubectl create secret docker-registry ghcr-pull-secret \
 ### Apply and verify
 
 ```bash
-# Apply/update all Kubernetes manifests
-kubectl apply -f k8s/configmap.yml
-kubectl apply -f k8s/deployment.yml
-kubectl apply -f k8s/service.yml
-kubectl apply -f k8s/hpa.yml
+# Deploy/update with Helm chart
+helm upgrade --install homelab-api-app charts/homelab-api \
+  --namespace app \
+  --values charts/homelab-api/values-dev.yaml
 
 # Check rollout and resources
-kubectl -n homelab rollout status deployment/homelab-api
-kubectl -n homelab get deploy,pods,svc,hpa
+kubectl -n app rollout status deployment/homelab-api-app
+kubectl -n app get deploy,pods,svc,ingress,hpa
+
+# Verify ingress controller status
+kubectl -n ingress-nginx get deploy,svc,pods
 
 # Verify app endpoints through Kind port mapping
 curl http://localhost:8080/health
@@ -391,7 +400,22 @@ curl http://localhost:8080/metrics
 
 - `kubectl get hpa` may show `cpu: <unknown>/60%` in Kind until metrics-server is installed.
 - With the current setup, application traffic path is:
-  `localhost:8080 -> kind control-plane:30080 -> Service:80 -> Pod:8080`
+  `localhost:8080 -> kind control-plane:30080 -> ingress-nginx -> Service:80 -> Pod:8080`
+
+### Pause and Resume Scripts (Kind)
+
+When you want to pause and resume quickly, use these helpers:
+
+```bash
+# Full cleanup (uninstall Helm releases + delete kind cluster)
+./scripts/kind-full-cleanup.sh
+
+# Full setup (cluster + ingress + namespaces + networkpolicy + app release)
+export GHCR_USERNAME=<github-username>
+export GHCR_TOKEN=<github-read:packages-token>
+export GHCR_EMAIL=<email>
+./scripts/kind-full-setup.sh
+```
 
 #### Build context optimization
 
@@ -414,6 +438,143 @@ policies/
 
 Only `app/`, `Dockerfile`, and required config files are included in the build context.
 
+## 🎯 Phase 5: Helm + Advanced Kubernetes
+
+Building on the foundational Kubernetes skills from Phase 4, Phase 5 introduces **Helm templating** for production-grade deployments and **advanced networking** with NetworkPolicy and namespace isolation.
+
+### What was added
+
+**Helm Chart Structure** (`charts/homelab-api/`)
+- Purpose: Templated deployment system that replaces raw manifests, enabling environment-specific configuration (dev vs prod)
+- Chart metadata: `Chart.yaml` defines versioning and chart identity
+- Base templates: `deployment.yaml`, `service.yaml`, `ingress.yaml`, `hpa.yaml`, `configmap.yaml` with Helm templating syntax
+- Helper functions: `_helpers.tpl` centralizes naming patterns (prevents duplication)
+- Values files:
+  - `values.yaml`: Base defaults for all deployments
+  - `values-dev.yaml`: Local Kind cluster optimization (2 replicas, info logging, 60% CPU, minimal resources)
+  - `values-prod.yaml`: High-availability settings (3-8 replicas, warning logging, 50% CPU, higher resource requests)
+
+**Namespace & Network Structure** (`k8s/namespaces/`)
+- `app.yaml`: Active workload namespace (hosts homelab-api Helm release)
+- `dev.yaml`: Staging namespace for testing candidate releases
+- `monitoring.yaml`: Reserved for Phase 6 observability stack (Prometheus, Grafana, Alertmanager)
+- Labels: Namespace classification for RBAC and resource policies
+
+**NetworkPolicy** (`k8s/networkpolicy.yaml`)
+- Zero-trust networking model: Deny all traffic by default, allow explicit rules only
+- **Ingress rule**: Allows traffic from `ingress-nginx` namespace only (HTTP from controller)
+- **Egress rule**: Allows DNS queries to `kube-system:53` only (service discovery)
+- Blocks: Pod-to-pod communication outside rules, internet egress, cross-namespace traffic
+- Learning impact: Enforces least-privilege networking, prevents lateral movement
+
+### Prerequisites
+
+**Create the app namespace and supporting infrastructure**
+
+```bash
+# Create namespaces
+kubectl apply -f k8s/namespaces/app.yaml
+kubectl apply -f k8s/namespaces/dev.yaml
+kubectl apply -f k8s/namespaces/monitoring.yaml
+
+# Create GHCR pull secret in app namespace
+kubectl create secret docker-registry ghcr-pull-secret \
+  --namespace app \
+  --docker-server=ghcr.io \
+  --docker-username=<github-username> \
+  --docker-password=<github-personal-access-token-with-read:packages> \
+  --docker-email=<email>
+
+# Apply NetworkPolicy (zero-trust enforcement)
+kubectl apply -f k8s/networkpolicy.yaml
+```
+
+### Deploy via Helm
+
+**Development environment** (for local Kind testing)
+```bash
+helm install homelab-api-app charts/homelab-api \
+  --namespace app \
+  --values charts/homelab-api/values-dev.yaml
+```
+
+**Production environment** (for real deployments)
+```bash
+helm install homelab-api-app charts/homelab-api \
+  --namespace app \
+  --values charts/homelab-api/values-prod.yaml
+```
+
+**Verify deployment**
+```bash
+# Check Helm release status
+helm list -n app
+
+# Inspect rendered templates (without applying)
+helm template homelab-api charts/homelab-api -f charts/homelab-api/values-dev.yaml
+
+# Check rollout and resources
+kubectl -n app rollout status deployment/homelab-api
+kubectl -n app get deploy,pods,svc,ingress,hpa
+
+# Verify app endpoints through Kind port mapping
+curl http://localhost:8080/health
+curl http://localhost:8080/api/greeting
+curl http://localhost:8080/metrics
+
+# Check NetworkPolicy enforcement
+kubectl -n app get networkpolicy
+```
+
+**Upgrade with different values**
+```bash
+helm upgrade homelab-api-app charts/homelab-api \
+  --namespace app \
+  --values charts/homelab-api/values-prod.yaml --dry-run
+
+# Review changes (--dry-run output) before applying
+helm upgrade homelab-api-app charts/homelab-api \
+  --namespace app \
+  --values charts/homelab-api/values-prod.yaml
+```
+
+### Key Helm Concepts
+
+**Templates vs Values Separation**
+- Templates define Kubernetes YAML structure with placeholder variables (`{{ .Values.replicaCount }}`)
+- Values files contain environment-specific data (2 replicas for dev, 3 for prod)
+- This separation enables single-source-of-truth templating: one template, many deployments
+
+**Conditional Rendering**
+- `{{ if .Values.hpa.enabled }}` conditionally includes HPA only when enabled
+- Allows feature toggle without modifying template files
+
+**Named Templates (Helpers)**
+- `_helpers.tpl` defines reusable patterns like `fullname` (combines release + chart name)
+- Prevents naming conflicts and ensures consistency across all resources
+
+**Release Management**
+- `helm install` creates a new release (idempotent name tracking)
+- `helm upgrade` updates an existing release (changes tracked in release history)
+- `helm list -n <namespace>` shows all releases and current status
+
+### Phase 5 Migration: Raw → Helm
+
+Raw Kubernetes manifests from Phase 4 are now removed, and the Helm chart is the single source of truth.
+
+```bash
+# All future updates: modify charts/homelab-api/values*.yaml and run helm upgrade
+# If needed, recover removed legacy files from git history.
+```
+
+### Notes
+
+- Helm is a package manager for Kubernetes; it generates final YAML from templates and values at deploy time
+- NetworkPolicy enforcement depends on CNI plugin support (Kind may not enforce by default; Calico, Cilium, and Weave do)
+- Use `helm lint` to validate chart syntax before deployment
+- Use `helm template` to inspect rendered YAML without applying
+- Values files are version-controlled; secrets should use external tools (Sealed Secrets, External Secrets, Vault)
+
 ## 🔐 Configuration
 
 ### Variables
@@ -432,9 +593,11 @@ This controls networking, IAM wiring context, ECR repository names, and EKS clus
 ## 🛡️ Security & CI/CD
 
 ### Custom Policies
-- **Checkov Policy**: `policies/tagging_policy.yml` enforces Owner tags on S3 buckets.
+- **Checkov Policy**: `policies/tagging_policy.yaml` enforces Owner tags on S3 buckets.
 
 ### GitHub Actions Workflows
+- **Build and Push**: Builds container image, scans with Trivy, and pushes to GHCR on pushes to main; validates image on PRs without pushing.
+- **Integration Test**: Creates ephemeral Kind cluster and deploys via Helm on PR events (main/dev branches) to validate Kubernetes integration before merge.
 - **Security Scan**: Runs Checkov on pushes/PRs to main, using custom policies.
 - **Infracost Estimate**: Calculates cost diffs on PRs and posts comments.
 - **Drift Detection**: Hourly Terraform plan checks for infrastructure drift.
