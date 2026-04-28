@@ -6,3 +6,4 @@
 terraform.tfvars
 .vscode/
 .venv/
+.kind-port-forwards/

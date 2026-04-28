@@ -10,6 +10,49 @@ MONITORING_NAMESPACE="monitoring"
 MONITORING_VALUES="charts/monitoring/values-kind.yaml"
 INGRESS_RELEASE="ingress-nginx"
 INGRESS_NAMESPACE="ingress-nginx"
+PORT_FORWARD_DIR=".kind-port-forwards"
+ENABLE_PORT_FORWARDS="${ENABLE_PORT_FORWARDS:-true}"
+GRAFANA_LOCAL_PORT="${GRAFANA_LOCAL_PORT:-13000}"
+PROMETHEUS_LOCAL_PORT="${PROMETHEUS_LOCAL_PORT:-9090}"
+
+start_port_forward() {
+  local name="$1"
+  local namespace="$2"
+  local service="$3"
+  local local_port="$4"
+  local remote_port="$5"
+  local pid_file="${PORT_FORWARD_DIR}/${name}.pid"
+  local log_file="${PORT_FORWARD_DIR}/${name}.log"
+
+  mkdir -p "${PORT_FORWARD_DIR}"
+
+  if [[ -f "${pid_file}" ]]; then
+    local existing_pid
+    existing_pid="$(cat "${pid_file}")"
+    if kill -0 "${existing_pid}" >/dev/null 2>&1; then
+      echo "Port-forward '${name}' already running (PID ${existing_pid}) on localhost:${local_port}."
+      return 0
+    fi
+    rm -f "${pid_file}"
+  fi
+
+  if lsof -tiTCP:"${local_port}" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "Warning: localhost:${local_port} is already in use. Skipping '${name}' port-forward."
+    return 0
+  fi
+
+  nohup kubectl --context "kind-${CLUSTER_NAME}" -n "${namespace}" \
+    port-forward "svc/${service}" "${local_port}:${remote_port}" >"${log_file}" 2>&1 &
+  local pf_pid=$!
+  sleep 1
+
+  if kill -0 "${pf_pid}" >/dev/null 2>&1; then
+    echo "Started '${name}' port-forward on localhost:${local_port} (PID ${pf_pid})."
+    echo "${pf_pid}" >"${pid_file}"
+  else
+    echo "Warning: failed to start '${name}' port-forward. Check ${log_file}."
+  fi
+}
 
 if ! command -v kind >/dev/null 2>&1; then
   echo "Error: kind is required but not installed."
@@ -120,4 +163,15 @@ kubectl rollout status deployment/${APP_RELEASE} \
 
 echo "Setup complete."
 echo "Verify app endpoint: curl http://localhost:8080/health"
-echo "Access Grafana: kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 13000:80"
+
+if [[ "${ENABLE_PORT_FORWARDS}" == "true" ]]; then
+  echo "Starting background port-forwards..."
+  start_port_forward "grafana" "${MONITORING_NAMESPACE}" "${MONITORING_RELEASE}-grafana" "${GRAFANA_LOCAL_PORT}" "80"
+  start_port_forward "prometheus" "${MONITORING_NAMESPACE}" "${MONITORING_RELEASE}-prometheus" "${PROMETHEUS_LOCAL_PORT}" "9090"
+  echo "Grafana URL: http://localhost:${GRAFANA_LOCAL_PORT}"
+  echo "Prometheus URL: http://localhost:${PROMETHEUS_LOCAL_PORT}"
+else
+  echo "Background port-forwards disabled (ENABLE_PORT_FORWARDS=${ENABLE_PORT_FORWARDS})."
+  echo "Access Grafana manually: kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana ${GRAFANA_LOCAL_PORT}:80"
+  echo "Access Prometheus manually: kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus ${PROMETHEUS_LOCAL_PORT}:9090"
+fi
