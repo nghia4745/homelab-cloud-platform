@@ -51,8 +51,8 @@ prometheus:
 # Grafana
 # ─────────────────────────────────────────────────────────
 # Access locally with:
-#   kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
-# Then open http://localhost:3000  (admin / admin)
+#   kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 13000:80
+# Then open http://localhost:13000  (admin / admin)
 grafana:
   # ⚠️  Change this before exposing Grafana outside localhost.
   adminPassword: admin
