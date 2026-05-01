@@ -3,6 +3,8 @@ name: Build and Push to GHCR
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - charts/homelab-api/values.yaml
   pull_request:
     branches: [main, dev]
 
