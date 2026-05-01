@@ -46,14 +46,14 @@ spec:
               kubernetes.io/metadata.name: ingress-nginx
       ports:
         - protocol: TCP
-          port: 80
+          port: 8080
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
       ports:
         - protocol: TCP
-          port: 80
+          port: 8080
   
   # Allow outbound traffic to kube-system for DNS resolution
   # (required for pod to resolve service names)
