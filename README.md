@@ -45,7 +45,7 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 ├── app/                           # Phase 3 sample Flask API
 │   ├── main.py                    # /health, /api/greeting, /metrics endpoints
 │   └── requirements.txt           # Python runtime dependencies
-├── charts/                        # Phase 5/6 Helm charts for app + observability
+├── charts/                        # Phase 5/6/7 Helm charts for app + observability + GitOps
 │   ├── homelab-api/               # Main application chart
 │       ├── Chart.yaml             # Chart metadata and versioning
 │       ├── values.yaml            # Base default values
@@ -60,8 +60,13 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │           ├── service.yaml       # Service template (ClusterIP for Ingress backend)
 │           ├── ingress.yaml       # Ingress template for HTTP routing
 │           └── hpa.yaml           # HorizontalPodAutoscaler template for auto-scaling
+│   ├── argocd/
+│       └── values-kind.yaml       # Kind-tuned ArgoCD values
 │   └── monitoring/
 │       └── values-kind.yaml       # Kind-tuned kube-prometheus-stack values
+├── argocd/
+│   └── applications/
+│       └── homelab-api.yaml       # ArgoCD Application for homelab-api chart
 ├── kind/
 │   └── cluster.yaml               # Kind cluster definition and local port mapping
 ├── k8s/
@@ -411,14 +416,29 @@ curl http://localhost:8080/metrics
 When you want to pause and resume quickly, use these helpers:
 
 ```bash
-# Full cleanup (uninstall app + monitoring + ingress releases, then delete kind cluster)
+# Full cleanup (uninstall app + monitoring + ArgoCD + ingress releases, then delete kind cluster)
 ./scripts/kind-full-cleanup.sh
 
-# Full setup (cluster + ingress + monitoring + namespaces + policy + app release)
+# Full setup (cluster + ingress + monitoring + ArgoCD + namespaces + policy + app release)
 export GHCR_USERNAME=<github-username>
 export GHCR_TOKEN=<github-read:packages-token>
 export GHCR_EMAIL=<email>
 ./scripts/kind-full-setup.sh
+```
+
+With default settings, setup also starts background port-forwards for:
+
+- ArgoCD: `http://localhost:8081`
+- Grafana: `http://localhost:13000`
+- Prometheus: `http://localhost:9090`
+
+Optional overrides:
+
+```bash
+export ENABLE_PORT_FORWARDS=true
+export ARGOCD_LOCAL_PORT=8081
+export GRAFANA_LOCAL_PORT=13000
+export PROMETHEUS_LOCAL_PORT=9090
 ```
 
 #### Build context optimization
@@ -655,6 +675,60 @@ lsof -tiTCP:13000 -sTCP:LISTEN | xargs kill -9
 - If Grafana restarts with `OOMKilled`, increase `grafana.resources.limits.memory` in `charts/monitoring/values-kind.yaml` and re-run Helm upgrade.
 - It is normal in Kind for some control-plane scrape targets (scheduler/controller-manager/proxy) to show `down`; app targets can still be `up`.
 
+## 🚢 Phase 7: GitOps with ArgoCD
+
+Phase 7 moves deployment reconciliation to ArgoCD and uses CI to open GitOps PRs for image tag updates.
+
+### What changed
+
+- Added ArgoCD values file: `charts/argocd/values-kind.yaml`
+- Added ArgoCD application manifest: `argocd/applications/homelab-api.yaml`
+- Updated setup script to install ArgoCD and apply application manifests
+- Updated cleanup script to uninstall ArgoCD and stop ArgoCD port-forward
+- Updated build-and-push workflow to create PRs for `charts/homelab-api/values.yaml`
+- Added loop prevention so values-only merges do not retrigger the same workflow endlessly
+
+### Verify ArgoCD after merging a GitOps PR
+
+```bash
+# 1) ArgoCD control plane should be running
+kubectl -n argocd get pods
+
+# 2) Application should be Synced + Healthy
+kubectl -n argocd get applications.argoproj.io homelab-api -o wide
+
+# 3) Read exact sync/health/revision values
+kubectl -n argocd get applications.argoproj.io homelab-api \
+  -o jsonpath='{.status.sync.status}{"\n"}{.status.health.status}{"\n"}{.status.sync.revision}{"\n"}'
+
+# 4) Check deployed image in Kubernetes
+kubectl -n app get deploy homelab-api-app \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+
+# 5) Check desired image tag in Git values
+grep -n "^  tag:" charts/homelab-api/values.yaml
+
+# 6) Confirm rollout completed
+kubectl -n app get deploy homelab-api-app \
+  -o jsonpath='{.status.updatedReplicas}{"/"}{.status.replicas}{" updated"}{"\n"}'
+```
+
+Expected result:
+
+- Sync status is `Synced`
+- Health status is `Healthy`
+- Deployed image tag matches `charts/homelab-api/values.yaml`
+- Rollout shows all replicas updated (for example `2/2 updated`)
+
+Optional self-healing proof:
+
+```bash
+kubectl -n app scale deploy homelab-api-app --replicas=0
+kubectl -n argocd get applications.argoproj.io homelab-api -w
+```
+
+ArgoCD should detect drift and restore the desired replicas automatically.
+
 ## 🔐 Configuration
 
 ### Variables
@@ -676,7 +750,7 @@ This controls networking, IAM wiring context, ECR repository names, and EKS clus
 - **Checkov Policy**: `policies/tagging_policy.yaml` enforces Owner tags on S3 buckets.
 
 ### GitHub Actions Workflows
-- **Build and Push**: Builds container image, scans with Trivy, and pushes to GHCR on pushes to main; validates image on PRs without pushing.
+- **Build and Push**: Builds container image, scans with Trivy, and pushes to GHCR on pushes to main; then opens a GitOps PR that updates `charts/homelab-api/values.yaml` with the new image tag. Values-only merges are ignored to avoid CI loops.
 - **Integration Test**: Creates ephemeral Kind cluster and deploys via Helm on PR events (main/dev branches) to validate Kubernetes integration before merge.
 - **Security Scan**: Runs Checkov on pushes/PRs to main, using custom policies.
 - **Infracost Estimate**: Calculates cost diffs on PRs and posts comments.
