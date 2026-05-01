@@ -17,6 +17,7 @@ jobs:
     runs-on: self-hosted
     permissions:
       contents: write
+      pull-requests: write
       packages: write
       security-events: write
       actions: read
@@ -79,31 +80,27 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
-      - name: Update Helm image tag in Git (GitOps)
+      - name: Update Helm image tag file (GitOps)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           IMAGE_TAG=${{ steps.meta.outputs.image_tag }}
-          awk -v image_tag="$IMAGE_TAG" '
-            /^image:[[:space:]]*$/ { in_image=1; print; next }
-            in_image && /^[^[:space:]]/ { in_image=0 }
-            in_image && /^([[:space:]]*)tag:[[:space:]]*/ {
-              match($0, /^[[:space:]]*/)
-              indent = substr($0, RSTART, RLENGTH)
-              print indent "tag: " image_tag
-              next
-            }
-            { print }
-          ' charts/homelab-api/values.yaml > charts/homelab-api/values.yaml.tmp
-          mv charts/homelab-api/values.yaml.tmp charts/homelab-api/values.yaml
+          sed -E -i.bak "s|^  tag: .*|  tag: $IMAGE_TAG|g" charts/homelab-api/values.yaml
+          rm -f charts/homelab-api/values.yaml.bak
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add charts/homelab-api/values.yaml
+      - name: Create PR for Helm image tag update (GitOps)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: chore(gitops): update homelab-api image tag to ${{ steps.meta.outputs.image_tag }}
+          title: chore(gitops): update homelab-api image tag to ${{ steps.meta.outputs.image_tag }}
+          body: |
+            Automated GitOps update from CI.
 
-          if git diff --cached --quiet; then
-            echo "No values change to commit."
-            exit 0
-          fi
-
-          git commit -m "chore(gitops): update homelab-api image tag to ${IMAGE_TAG}"
-          git push
+            - Image tag: `${{ steps.meta.outputs.image_tag }}`
+            - File: `charts/homelab-api/values.yaml`
+          branch: ci/gitops-image-tag-${{ steps.meta.outputs.image_tag }}
+          base: main
+          add-paths: |
+            charts/homelab-api/values.yaml
+          delete-branch: true
