@@ -8,10 +8,15 @@ APP_NAMESPACE="app"
 MONITORING_RELEASE="kube-prometheus-stack"
 MONITORING_NAMESPACE="monitoring"
 MONITORING_VALUES="charts/monitoring/values-kind.yaml"
+ARGOCD_RELEASE="argocd"
+ARGOCD_NAMESPACE="argocd"
+ARGOCD_VALUES="charts/argocd/values-kind.yaml"
+ARGOCD_APPS_DIR="argocd/applications"
 INGRESS_RELEASE="ingress-nginx"
 INGRESS_NAMESPACE="ingress-nginx"
 PORT_FORWARD_DIR=".kind-port-forwards"
 ENABLE_PORT_FORWARDS="${ENABLE_PORT_FORWARDS:-true}"
+ARGOCD_LOCAL_PORT="${ARGOCD_LOCAL_PORT:-8081}"
 GRAFANA_LOCAL_PORT="${GRAFANA_LOCAL_PORT:-13000}"
 PROMETHEUS_LOCAL_PORT="${PROMETHEUS_LOCAL_PORT:-9090}"
 
@@ -79,6 +84,11 @@ if [[ ! -f "${MONITORING_VALUES}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${ARGOCD_VALUES}" ]]; then
+  echo "Error: ArgoCD values file not found at ${ARGOCD_VALUES}."
+  exit 1
+fi
+
 if ! kind get clusters 2>/dev/null | grep -qx "${CLUSTER_NAME}"; then
   echo "Creating Kind cluster '${CLUSTER_NAME}'..."
   kind create cluster --config "${CLUSTER_CONFIG}"
@@ -93,6 +103,8 @@ echo "Adding/updating ingress-nginx Helm repo..."
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
 echo "Adding/updating prometheus-community Helm repo..."
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
+echo "Adding/updating argo Helm repo..."
+helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
 helm repo update >/dev/null
 
 echo "Installing/upgrading ingress-nginx controller..."
@@ -131,6 +143,30 @@ kubectl rollout status deployment/${MONITORING_RELEASE}-grafana \
   --context "kind-${CLUSTER_NAME}" \
   --timeout=180s
 
+echo "Installing/upgrading ArgoCD..."
+helm upgrade --install "${ARGOCD_RELEASE}" argo/argo-cd \
+  --kube-context "kind-${CLUSTER_NAME}" \
+  --namespace "${ARGOCD_NAMESPACE}" \
+  --create-namespace \
+  --values "${ARGOCD_VALUES}"
+
+kubectl rollout status deployment/${ARGOCD_RELEASE}-server \
+  -n "${ARGOCD_NAMESPACE}" \
+  --context "kind-${CLUSTER_NAME}" \
+  --timeout=180s
+
+kubectl rollout status deployment/${ARGOCD_RELEASE}-repo-server \
+  -n "${ARGOCD_NAMESPACE}" \
+  --context "kind-${CLUSTER_NAME}" \
+  --timeout=180s
+
+if [[ -d "${ARGOCD_APPS_DIR}" ]] && find "${ARGOCD_APPS_DIR}" -maxdepth 1 -type f \( -name "*.yaml" -o -name "*.yml" \) | grep -q .; then
+  echo "Applying ArgoCD application manifests from ${ARGOCD_APPS_DIR}..."
+  kubectl apply -f "${ARGOCD_APPS_DIR}" --context "kind-${CLUSTER_NAME}"
+else
+  echo "No ArgoCD application manifests found in ${ARGOCD_APPS_DIR}; skipping apply."
+fi
+
 if [[ -z "${GHCR_USERNAME:-}" || -z "${GHCR_TOKEN:-}" ]]; then
   echo "Error: GHCR_USERNAME and GHCR_TOKEN must be set to create ghcr-pull-secret."
   echo "Optional: set GHCR_EMAIL (defaults to you@example.com)."
@@ -166,12 +202,15 @@ echo "Verify app endpoint: curl http://localhost:8080/health"
 
 if [[ "${ENABLE_PORT_FORWARDS}" == "true" ]]; then
   echo "Starting background port-forwards..."
+  start_port_forward "argocd" "${ARGOCD_NAMESPACE}" "${ARGOCD_RELEASE}-server" "${ARGOCD_LOCAL_PORT}" "80"
   start_port_forward "grafana" "${MONITORING_NAMESPACE}" "${MONITORING_RELEASE}-grafana" "${GRAFANA_LOCAL_PORT}" "80"
   start_port_forward "prometheus" "${MONITORING_NAMESPACE}" "${MONITORING_RELEASE}-prometheus" "${PROMETHEUS_LOCAL_PORT}" "9090"
+  echo "ArgoCD URL: http://localhost:${ARGOCD_LOCAL_PORT}"
   echo "Grafana URL: http://localhost:${GRAFANA_LOCAL_PORT}"
   echo "Prometheus URL: http://localhost:${PROMETHEUS_LOCAL_PORT}"
 else
   echo "Background port-forwards disabled (ENABLE_PORT_FORWARDS=${ENABLE_PORT_FORWARDS})."
+  echo "Access ArgoCD manually: kubectl -n argocd port-forward svc/argocd-server ${ARGOCD_LOCAL_PORT}:80"
   echo "Access Grafana manually: kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana ${GRAFANA_LOCAL_PORT}:80"
   echo "Access Prometheus manually: kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus ${PROMETHEUS_LOCAL_PORT}:9090"
 fi
