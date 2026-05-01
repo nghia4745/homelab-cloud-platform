@@ -29,6 +29,50 @@ jobs:
       - name: Create Kind integration cluster
         run: kind create cluster --name integration --wait 60s
 
+      - name: Install ArgoCD (integration cluster)
+        run: |
+          helm repo add argo https://argoproj.github.io/argo-helm
+          helm repo update
+
+          helm upgrade --install argocd argo/argo-cd \
+            --kube-context kind-integration \
+            --namespace argocd \
+            --create-namespace \
+            --values charts/argocd/values-kind.yaml
+
+      - name: Wait for ArgoCD control plane
+        run: |
+          kubectl rollout status statefulset/argocd-application-controller \
+            --namespace argocd \
+            --context kind-integration \
+            --timeout=180s
+
+          kubectl rollout status deployment/argocd-server \
+            --namespace argocd \
+            --context kind-integration \
+            --timeout=180s
+
+          kubectl rollout status deployment/argocd-repo-server \
+            --namespace argocd \
+            --context kind-integration \
+            --timeout=180s
+
+      - name: Verify ArgoCD health
+        run: |
+          kubectl get applications.argoproj.io \
+            --context kind-integration \
+            --namespace argocd
+
+          kubectl get pods \
+            --namespace argocd \
+            --context kind-integration
+
+          kubectl port-forward svc/argocd-server 18081:80 \
+            --namespace argocd \
+            --context kind-integration &
+          sleep 3
+          curl --fail http://localhost:18081/healthz
+
       # Load the locally built image directly - no registry, no pull secret needed.
       - name: Load test image into Kind
         run: kind load docker-image homelab-api:test --name integration

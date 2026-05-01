@@ -41,7 +41,7 @@ A hands-on Terraform project demonstrating infrastructure-as-code concepts with 
 │   ├── infracost.yaml             # Estimates infrastructure costs on PRs
 │   ├── drift-detection.yaml       # Hourly drift detection via Terraform plan
 │   ├── build-and-push.yaml        # Builds, scans, and pushes container to GHCR
-│   └── integration-test.yaml      # Runs Kind-based Kubernetes integration tests
+│   └── integration-test.yaml      # Runs Kind-based Kubernetes + ArgoCD health integration tests
 ├── app/                           # Phase 3 sample Flask API
 │   ├── main.py                    # /health, /api/greeting, /metrics endpoints
 │   └── requirements.txt           # Python runtime dependencies
@@ -355,6 +355,7 @@ Phase 4 established the core Kubernetes architecture on Kind (Pods, Service, Ing
   - Terminates incoming HTTP and forwards traffic to Service `homelab-api-app`
 - `.github/workflows/integration-test.yaml`
   - Creates ephemeral Kind cluster in CI
+  - Installs ArgoCD and verifies ArgoCD control-plane health
   - Deploys Helm release and validates `/health`, `/api/greeting`, and `/metrics`
 
 ### Prerequisites
@@ -761,7 +762,7 @@ This controls networking, IAM wiring context, ECR repository names, and EKS clus
 
 ### GitHub Actions Workflows
 - **Build and Push**: Builds container image, scans with Trivy, and pushes to GHCR on pushes to main; then opens a GitOps PR that updates `charts/homelab-api/values.yaml` with the new image tag. Values-only merges are ignored to avoid CI loops.
-- **Integration Test**: Creates ephemeral Kind cluster and deploys via Helm on PR events (main/dev branches) to validate Kubernetes integration before merge.
+- **Integration Test**: Creates ephemeral Kind cluster, installs ArgoCD, validates ArgoCD health, then deploys via Helm on PR events (main/dev branches) to validate Kubernetes integration before merge.
 - **Security Scan**: Runs Checkov on pushes/PRs to main, using custom policies.
 - **Infracost Estimate**: Calculates cost diffs on PRs and posts comments.
 - **Drift Detection**: Hourly Terraform plan checks for infrastructure drift.
