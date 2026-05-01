@@ -690,6 +690,16 @@ Phase 7 moves deployment reconciliation to ArgoCD and uses CI to open GitOps PRs
 
 ### Verify ArgoCD after merging a GitOps PR
 
+Fast path (one command):
+
+```bash
+./scripts/verify-argocd.sh
+```
+
+The script checks ArgoCD pod readiness, app sync/health/revision, deployed image, and rollout completion.
+
+Manual checks:
+
 ```bash
 # 1) ArgoCD control plane should be running
 kubectl -n argocd get pods
