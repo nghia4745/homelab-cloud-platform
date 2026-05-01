@@ -1,0 +1,120 @@
+# argo-cd — Kind-tuned values
+# ============================
+# ArgoCD is made up of several components, each its own Deployment:
+#
+#   Component              Role
+#   ─────────────────────  ──────────────────────────────────────────────────
+#   server                 API + Web UI; the thing you open in a browser
+#   repoServer             Clones Git repos; renders Helm/Kustomize manifests
+#   applicationSet         Generates Application objects from generators
+#   controller             Compares live cluster state vs Git desired state
+#   dex                    Optional SSO broker (OIDC); disabled here
+#   redis                  Caches rendered manifests between syncs
+#   notifications          Sends Slack/email alerts on sync events; disabled
+#
+# Kind clusters run on your laptop with limited RAM/CPU, so this file:
+#   - Sets replicas to 1 for every component (no HA needed locally)
+#   - Trims memory limits to values that fit alongside the monitoring stack
+#   - Disables dex (no SSO needed) and notifications
+#   - Disables TLS on the server so plain HTTP port-forward works easily
+# ──────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────
+# Global
+# ─────────────────────────────────────────────────────────
+global:
+  # Use a single replica everywhere — Kind has no need for HA.
+  # Production would set these to 2+ for availability.
+  replicaCount: 1
+
+# ─────────────────────────────────────────────────────────
+# ArgoCD Server (API + Web UI)
+# ─────────────────────────────────────────────────────────
+server:
+  replicas: 1
+
+  # Disable TLS on the server pod itself.
+  # With port-forward you're already on localhost; TLS only complicates
+  # self-signed cert warnings. Production sits behind an Ingress with real TLS.
+  extraArgs:
+    - --insecure
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+
+# ─────────────────────────────────────────────────────────
+# Repo Server (Git clone + manifest rendering)
+# ─────────────────────────────────────────────────────────
+repoServer:
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+
+# ─────────────────────────────────────────────────────────
+# Application Controller (reconciliation loop)
+# ─────────────────────────────────────────────────────────
+controller:
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ─────────────────────────────────────────────────────────
+# ApplicationSet Controller
+# ─────────────────────────────────────────────────────────
+applicationSet:
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 64Mi
+
+# ─────────────────────────────────────────────────────────
+# Redis (manifest cache)
+# ─────────────────────────────────────────────────────────
+redis:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 64Mi
+
+# ─────────────────────────────────────────────────────────
+# Dex (SSO broker) — disabled
+# ─────────────────────────────────────────────────────────
+# Dex enables OIDC single sign-on (GitHub, Google, LDAP, etc.).
+# For local Kind dev we just use the built-in admin account.
+dex:
+  enabled: false
+
+# ─────────────────────────────────────────────────────────
+# Notifications — disabled
+# ─────────────────────────────────────────────────────────
+# Notifications sends Slack/email messages on sync events.
+# Not needed locally; enable when deploying to a real cluster.
+notifications:
+  enabled: false

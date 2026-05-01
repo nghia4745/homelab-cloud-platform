@@ -6,13 +6,17 @@ on:
   pull_request:
     branches: [main, dev]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     if:
-      github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+      github.actor != 'github-actions[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: self-hosted
     permissions:
-      contents: read
+      contents: write
       packages: write
       security-events: write
       actions: read
@@ -74,3 +78,32 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/homelab-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      
+      - name: Update Helm image tag in Git (GitOps)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          IMAGE_TAG=${{ steps.meta.outputs.image_tag }}
+          awk -v image_tag="$IMAGE_TAG" '
+            /^image:[[:space:]]*$/ { in_image=1; print; next }
+            in_image && /^[^[:space:]]/ { in_image=0 }
+            in_image && /^([[:space:]]*)tag:[[:space:]]*/ {
+              match($0, /^[[:space:]]*/)
+              indent = substr($0, RSTART, RLENGTH)
+              print indent "tag: " image_tag
+              next
+            }
+            { print }
+          ' charts/homelab-api/values.yaml > charts/homelab-api/values.yaml.tmp
+          mv charts/homelab-api/values.yaml.tmp charts/homelab-api/values.yaml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add charts/homelab-api/values.yaml
+
+          if git diff --cached --quiet; then
+            echo "No values change to commit."
+            exit 0
+          fi
+
+          git commit -m "chore(gitops): update homelab-api image tag to ${IMAGE_TAG}"
+          git push
