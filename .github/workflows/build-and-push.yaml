@@ -9,10 +9,10 @@ on:
 jobs:
   build:
     if:
-      github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+      github.actor != 'github-actions[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: self-hosted
     permissions:
-      contents: read
+      contents: write
       packages: write
       security-events: write
       actions: read
@@ -74,3 +74,22 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/homelab-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      
+      - name: Update Helm image tag in Git (GitOps)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          IMAGE_TAG=${{ steps.meta.outputs.image_tag }}
+          sed -E -i.bak "s|^ tag: .*| tag: $IMAGE_TAG|g" charts/homelab-api/values.yaml
+          rm -f charts/homelab-api/values.yaml.bak
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add charts/homelab-api/values.yaml
+
+          if git diff --cached --quiet; then
+            echo "No values change to commit."
+            exit 0
+          fi
+
+          git commit -m "chore(gitops): update homelab-api image tag to ${IMAGE_TAG}"
+          git push
