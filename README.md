@@ -740,6 +740,45 @@ kubectl -n argocd get applications.argoproj.io homelab-api -w
 
 ArgoCD should detect drift and restore the desired replicas automatically.
 
+### Phase 7.5 — Promotion Model (dev auto-sync, prod manual)
+
+The project uses two separate ArgoCD Applications to represent the dev→prod promotion flow:
+
+| Application | Namespace | Values file | Sync mode |
+|---|---|---|---|
+| `homelab-api` | `app` | `values-dev.yaml` | Automated (prune + selfHeal) |
+| `homelab-api-prod` | `prod` | `values-prod.yaml` | Manual |
+
+**Dev** is automatically kept in sync with every merge to `main`. **Prod** is intentionally frozen until a human promotes.
+
+#### Apply both Applications (one-time setup)
+
+```bash
+kubectl apply -f argocd/applications/homelab-api.yaml
+kubectl apply -f argocd/applications/homelab-api-prod.yaml
+```
+
+#### Promoting from dev to prod
+
+1. Verify dev is healthy:
+   ```bash
+   ./scripts/verify-argocd.sh
+   ```
+2. Update the image tag in `charts/homelab-api/values-prod.yaml` (copy the tag from `values.yaml`):
+   ```yaml
+   image:
+     tag: sha-<commit>
+   ```
+3. Commit and push, then trigger a manual sync in the ArgoCD UI (or CLI):
+   ```bash
+   argocd app sync homelab-api-prod
+   ```
+4. Confirm prod rollout:
+   ```bash
+   kubectl -n prod get deploy homelab-api-prod \
+     -o jsonpath='{.status.updatedReplicas}{"/"}{.status.replicas}{" updated"}{"\n"}'
+   ```
+
 ## 🔐 Configuration
 
 ### Variables
