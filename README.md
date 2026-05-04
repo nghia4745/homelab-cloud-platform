@@ -784,6 +784,7 @@ kubectl apply -f argocd/applications/homelab-api-prod.yaml
 ### Trivy — block CI on critical CVEs
 
 The build workflow now runs Trivy with `exit-code: 1` and `severity: CRITICAL`. Any image with a fixable critical CVE will fail the build before the image is pushed to GHCR.
+** For now, setting exit-code: 0 **
 
 No extra setup required — this takes effect on the next push to `main`.
 
