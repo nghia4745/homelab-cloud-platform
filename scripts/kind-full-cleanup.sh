@@ -8,6 +8,8 @@ MONITORING_RELEASE="kube-prometheus-stack"
 MONITORING_NAMESPACE="monitoring"
 ARGOCD_RELEASE="argocd"
 ARGOCD_NAMESPACE="argocd"
+KYVERNO_RELEASE="kyverno"
+KYVERNO_NAMESPACE="kyverno"
 INGRESS_RELEASE="ingress-nginx"
 INGRESS_NAMESPACE="ingress-nginx"
 PORT_FORWARD_DIR=".kind-port-forwards"
@@ -57,6 +59,7 @@ echo "Cleaning up Helm releases in kind-${CLUSTER_NAME}..."
 helm uninstall "${APP_RELEASE}" -n "${APP_NAMESPACE}" --kube-context "kind-${CLUSTER_NAME}" >/dev/null 2>&1 || true
 helm uninstall "${MONITORING_RELEASE}" -n "${MONITORING_NAMESPACE}" --kube-context "kind-${CLUSTER_NAME}" >/dev/null 2>&1 || true
 helm uninstall "${ARGOCD_RELEASE}" -n "${ARGOCD_NAMESPACE}" --kube-context "kind-${CLUSTER_NAME}" >/dev/null 2>&1 || true
+helm uninstall "${KYVERNO_RELEASE}" -n "${KYVERNO_NAMESPACE}" --kube-context "kind-${CLUSTER_NAME}" >/dev/null 2>&1 || true
 helm uninstall "${INGRESS_RELEASE}" -n "${INGRESS_NAMESPACE}" --kube-context "kind-${CLUSTER_NAME}" >/dev/null 2>&1 || true
 
 echo "Deleting Kind cluster '${CLUSTER_NAME}'..."

@@ -12,6 +12,9 @@ ARGOCD_RELEASE="argocd"
 ARGOCD_NAMESPACE="argocd"
 ARGOCD_VALUES="charts/argocd/values-kind.yaml"
 ARGOCD_APPS_DIR="argocd/applications"
+KYVERNO_RELEASE="kyverno"
+KYVERNO_NAMESPACE="kyverno"
+KYVERNO_POLICIES="k8s/kyverno-policies.yaml"
 INGRESS_RELEASE="ingress-nginx"
 INGRESS_NAMESPACE="ingress-nginx"
 PORT_FORWARD_DIR=".kind-port-forwards"
@@ -105,6 +108,8 @@ echo "Adding/updating prometheus-community Helm repo..."
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
 echo "Adding/updating argo Helm repo..."
 helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
+echo "Adding/updating kyverno Helm repo..."
+helm repo add kyverno https://kyverno.github.io/kyverno >/dev/null 2>&1 || true
 helm repo update >/dev/null
 
 echo "Installing/upgrading ingress-nginx controller..."
@@ -166,6 +171,21 @@ if [[ -d "${ARGOCD_APPS_DIR}" ]] && find "${ARGOCD_APPS_DIR}" -maxdepth 1 -type 
 else
   echo "No ArgoCD application manifests found in ${ARGOCD_APPS_DIR}; skipping apply."
 fi
+
+echo "Installing/upgrading Kyverno..."
+helm upgrade --install "${KYVERNO_RELEASE}" kyverno/kyverno \
+  --kube-context "kind-${CLUSTER_NAME}" \
+  --namespace "${KYVERNO_NAMESPACE}" \
+  --create-namespace \
+  --set admissionController.replicas=1
+
+kubectl rollout status deployment/kyverno-admission-controller \
+  -n "${KYVERNO_NAMESPACE}" \
+  --context "kind-${CLUSTER_NAME}" \
+  --timeout=180s
+
+echo "Applying Kyverno policies..."
+kubectl apply -f "${KYVERNO_POLICIES}" --context "kind-${CLUSTER_NAME}"
 
 if [[ -z "${GHCR_USERNAME:-}" || -z "${GHCR_TOKEN:-}" ]]; then
   echo "Error: GHCR_USERNAME and GHCR_TOKEN must be set to create ghcr-pull-secret."

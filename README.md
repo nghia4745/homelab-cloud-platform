@@ -779,7 +779,47 @@ kubectl apply -f argocd/applications/homelab-api-prod.yaml
      -o jsonpath='{.status.updatedReplicas}{"/"}{.status.replicas}{" updated"}{"\n"}'
    ```
 
-## 🔐 Configuration
+## �️ Phase 8 — DevSecOps
+
+### Trivy — block CI on critical CVEs
+
+The build workflow now runs Trivy with `exit-code: 1` and `severity: CRITICAL`. Any image with a fixable critical CVE will fail the build before the image is pushed to GHCR.
+
+No extra setup required — this takes effect on the next push to `main`.
+
+### Kyverno — admission control policies
+
+Kyverno is installed on the Kind cluster and enforces two cluster-wide policies defined in `k8s/kyverno-policies.yaml`:
+
+| Policy | Effect |
+|---|---|
+| `disallow-latest-tag` | Blocks Pods in `app`, `dev`, `prod` that reference `:latest` or an untagged image |
+| `disallow-privileged-containers` | Blocks Pods in `app`, `dev`, `prod` that set `privileged: true` |
+
+Both policies are set to `Enforce` — violating Pods are rejected at admission time before they can run.
+
+#### Verify policies are active
+
+```bash
+kubectl get clusterpolicy
+```
+
+Expected output:
+
+```
+NAME                          ADMISSION   BACKGROUND   VALIDATE ACTION   READY   AGE
+disallow-latest-tag           true        true         Enforce           True    …
+disallow-privileged-containers true       true         Enforce           True    …
+```
+
+#### Test the no-latest-tag policy
+
+```bash
+kubectl -n app run test --image=nginx:latest --restart=Never
+# Expected: Error from server: admission webhook denied the request
+```
+
+## �🔐 Configuration
 
 ### Variables
 Edit `secret.auto.tfvars` to customize:
@@ -800,7 +840,7 @@ This controls networking, IAM wiring context, ECR repository names, and EKS clus
 - **Checkov Policy**: `policies/tagging_policy.yaml` enforces Owner tags on S3 buckets.
 
 ### GitHub Actions Workflows
-- **Build and Push**: Builds container image, scans with Trivy, and pushes to GHCR on pushes to main; then opens a GitOps PR that updates `charts/homelab-api/values.yaml` with the new image tag. Values-only merges are ignored to avoid CI loops.
+- **Build and Push**: Builds container image, scans with Trivy (fails on fixable CRITICAL CVEs), and pushes to GHCR on pushes to main; then opens a GitOps PR that updates `charts/homelab-api/values.yaml` with the new image tag. Values-only merges are ignored to avoid CI loops.
 - **Integration Test**: Creates ephemeral Kind cluster, installs ArgoCD, validates ArgoCD health, then deploys via Helm on PR events (main/dev branches) to validate Kubernetes integration before merge.
 - **Security Scan**: Runs Checkov on pushes/PRs to main, using custom policies.
 - **Infracost Estimate**: Calculates cost diffs on PRs and posts comments.
